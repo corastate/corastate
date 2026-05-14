@@ -1,0 +1,40 @@
+{
+  "name": "corastate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open-core device health aggregation engine.",
+  "author": "Wesley Lakis",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.11",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "dotenv -e .env -- pnpm -r --parallel --filter=./apps/* run dev",
+    "build": "pnpm -r run build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "migrate": "pnpm --filter @corastate/db run migrate",
+    "db:generate": "pnpm --filter @corastate/db run generate",
+    "db:push": "pnpm --filter @corastate/db run push",
+    "db:studio": "pnpm --filter @corastate/db run studio"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^8.12.2",
+    "@typescript-eslint/parser": "^8.12.2",
+    "dotenv-cli": "^7.4.2",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@10.33.3",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
