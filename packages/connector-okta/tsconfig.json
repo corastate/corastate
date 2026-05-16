@@ -8,6 +8,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [{ "path": "../connector-sdk" }]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -1,55 +1,54 @@
 /**
- * Corastate schema (Drizzle).
+ * Corastate schema (Drizzle). Aligned to architecture-v3.
  *
- * The shape here is the canonical version of the sketch in the architecture
- * doc. Three tables carry the system:
+ * Tables:
+ *   observations            Append-only fact log. Partitioned by date in a
+ *                           follow-up migration.
+ *   entities                Correlated entities (device, identity, agent).
+ *   sync_runs               One row per connector run.
+ *   key_versions            Master-key versions. Rotation creates a new row
+ *                           and re-wraps every credential's data key.
+ *   credentials             Envelope-encrypted secrets per (source, name).
+ *   credential_access_audit Append-only log of every encrypt/decrypt event.
  *
- *   observations  Append-only log of every (source, entity, attribute, value)
- *                 fact a connector has ever reported. Partitioned by date.
- *   entities      Corastate-internal correlated identifiers. An entity is one
- *                 device, identity, or agent across however many source tools
- *                 happen to know about it.
- *   sync_runs     One row per connector run. Every observation carries the
- *                 sync_run_id that produced it, which is what lets us answer
- *                 "where did this value come from" in a single join.
- *
- * Drizzle does not emit PARTITION BY today. The observations table is declared
- * as a plain table here; the partition conversion lives in drizzle/0001_partition.sql
- * and runs after the generated migration.
+ * The credential layer is Phase 1 foundational per architecture-v3
+ * §"Credential and security architecture": the storage shape cannot be
+ * retrofitted once data exists, so key_version_id, the refresh-token
+ * columns, and the audit table are present from the first migration.
  */
 
 import { sql } from 'drizzle-orm';
 import {
   bigserial,
+  boolean,
+  customType,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  serial,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+
+// Drizzle's pg-core does not export `bytea` directly. customType is the
+// idiomatic escape hatch.
+const bytea = customType<{ data: Buffer; default: false }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
 
-/**
- * The kinds of things Corastate can correlate. v1 covers devices, identities,
- * and agents. Future kinds (license, saas_app) can be added without rewriting
- * the observation log.
- */
 export const entityKindEnum = pgEnum('entity_kind', ['device', 'identity', 'agent']);
 
-/**
- * Lifecycle states for a single connector run.
- *   running    The run has started and has not finished.
- *   succeeded  The run finished, no fatal error.
- *   failed     The run hit an error the connector could not recover from.
- *   cancelled  An operator stopped the run before it finished.
- */
 export const syncRunStatusEnum = pgEnum('sync_run_status', [
   'running',
   'succeeded',
@@ -57,27 +56,22 @@ export const syncRunStatusEnum = pgEnum('sync_run_status', [
   'cancelled',
 ]);
 
+export const credentialActionEnum = pgEnum('credential_action', [
+  'encrypt',
+  'decrypt',
+  'rotate',
+  'mark_dead',
+]);
+
 // ---------------------------------------------------------------------------
 // entities
 // ---------------------------------------------------------------------------
 
-/**
- * One row per correlated thing (device, identity, or agent). The id is the
- * `entity_id` referenced from observations. Source-specific identifiers stay
- * in observations as source_record_id; the correlation engine writes a row
- * here when it decides two source records are the same underlying entity.
- */
 export const entities = pgTable(
   'entities',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: entityKindEnum('kind').notNull(),
-    /**
-     * Human-readable label for the entity. Picked by the correlation engine
-     * from the most useful attribute it can find (hostname for devices,
-     * primary email for identities). Not authoritative; the truth is in
-     * observations.
-     */
     displayName: text('display_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -92,31 +86,17 @@ export const entities = pgTable(
 // sync_runs
 // ---------------------------------------------------------------------------
 
-/**
- * One row per connector run. Append-only in normal operation; the only update
- * that should happen is the transition from running to one of the terminal
- * states when the run finishes.
- */
 export const syncRuns = pgTable(
   'sync_runs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    /** Connector id, e.g. 'okta', 'crowdstrike-falcon'. */
     connectorId: text('connector_id').notNull(),
-    /** Connector version (semver) for traceability. */
     connectorVersion: text('connector_version').notNull(),
     status: syncRunStatusEnum('status').notNull().default('running'),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
-    /** Count of observations the run wrote. Updated when the run finishes. */
     observationCount: integer('observation_count').notNull().default(0),
-    /** First fatal error message, if any. */
     errorMessage: text('error_message'),
-    /**
-     * Free-form context: pagination cursor for incremental syncs, rate-limit
-     * back-off counters, anything else the connector wants to record on the
-     * run itself rather than as observations.
-     */
     context: jsonb('context').$type<Record<string, unknown>>(),
   },
   (t) => ({
@@ -132,35 +112,17 @@ export const syncRuns = pgTable(
 // observations
 // ---------------------------------------------------------------------------
 
-/**
- * The append-only fact log.
- *
- * Primary key is (observed_at, id). The compound key is required because
- * Postgres demands the partition key be part of any unique constraint on a
- * partitioned table, and we partition by observed_at.
- *
- * Two indexes match the two access patterns the architecture doc calls out:
- *   - (entity_id, attribute, observed_at DESC) for current-state lookups.
- *   - (source, source_record_id, observed_at DESC) for connector-side
- *     deduplication and "did this source change anything since last run."
- */
 export const observations = pgTable(
   'observations',
   {
     id: bigserial('id', { mode: 'bigint' }).notNull(),
     observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
-    /** Connector id that produced the observation (e.g. 'okta'). */
     source: text('source').notNull(),
-    /** Vendor's primary key for the record at the source. */
     sourceRecordId: text('source_record_id').notNull(),
     entityKind: entityKindEnum('entity_kind').notNull(),
-    /** Corastate-internal correlated id. Joins to entities.id. */
     entityId: uuid('entity_id').notNull(),
-    /** Attribute name, e.g. 'os_version', 'disk_encryption', 'last_check_in'. */
     attribute: text('attribute').notNull(),
-    /** Attribute value. JSONB so we can store strings, numbers, booleans, and small structs uniformly. */
     value: jsonb('value').notNull(),
-    /** The sync run that produced this row. Joins to sync_runs.id. */
     syncRunId: uuid('sync_run_id').notNull(),
   },
   (t) => ({
@@ -180,18 +142,123 @@ export const observations = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// Raw SQL fragments
+// key_versions
 // ---------------------------------------------------------------------------
 
 /**
- * SQL for the current_state materialized view. The view is the read path for
- * "the most recent value per (entity, source, attribute)." It is refreshed
- * concurrently by the connector framework at the end of each sync run.
- *
- * We keep this as a sql template rather than a Drizzle table because Drizzle
- * does not model materialized views directly. The migrate command in the CLI
- * runs this after the generated schema migration.
+ * Master-key versions. The KeyProvider knows which version is current; each
+ * row records the provider-supplied id of one historical key. Rotation:
+ * insert a new row, mark the previous row deactivated_at = now(), re-wrap
+ * every credentials.wrapped_data_key with the new master key, update
+ * credentials.key_version_id to point at the new row. The re-wrap is cheap
+ * because it only touches the small wrapped keys.
  */
+export const keyVersions = pgTable(
+  'key_versions',
+  {
+    id: serial('id').primaryKey(),
+    /** Provider-supplied id. For the env-var provider, a stable token derived from the key bytes. */
+    keyId: text('key_id').notNull(),
+    isCurrent: boolean('is_current').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
+  },
+  (t) => ({
+    keyIdUnique: uniqueIndex('key_versions_key_id_unique').on(t.keyId),
+    // Phase 1 invariant: at most one row with is_current=true. Enforced by
+    // application logic and a partial unique index added in a follow-up
+    // migration once the rotation helper lands.
+    currentIdx: index('key_versions_is_current_idx').on(t.isCurrent),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// credentials
+// ---------------------------------------------------------------------------
+
+/**
+ * Envelope-encrypted secret per (source_id, name). Connector code references
+ * the (source_id, name) pair; values never appear in connector code.
+ *
+ * Storage layout:
+ *   ciphertext / nonce          The secret value, encrypted under data_key (AES-256-GCM).
+ *   wrapped_data_key /
+ *   wrapped_data_key_nonce      The data key, encrypted under the master key
+ *                               named by key_version_id.
+ *   aad                         Additional authenticated data passed to GCM.
+ *                               Carries (source_id, name) so tampering with
+ *                               either field invalidates the ciphertext.
+ *   oauth_*                     Refresh-token columns from the start so the
+ *                               OAuth lifecycle helpers (Phase 1 Week 1) can
+ *                               atomically update both the access token and
+ *                               the refresh token in one transaction.
+ */
+export const credentials = pgTable(
+  'credentials',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sourceId: text('source_id').notNull(),
+    name: text('name').notNull(),
+    ciphertext: bytea('ciphertext').notNull(),
+    nonce: bytea('nonce').notNull(),
+    wrappedDataKey: bytea('wrapped_data_key').notNull(),
+    wrappedDataKeyNonce: bytea('wrapped_data_key_nonce').notNull(),
+    keyVersionId: integer('key_version_id').notNull(),
+    aad: jsonb('aad').notNull().$type<{ sourceId: string; name: string }>(),
+    /** Permanent-failure flag; surfaced to the UI. */
+    dead: boolean('dead').notNull().default(false),
+    /** OAuth refresh-token ciphertext, encrypted under the same data key. */
+    oauthRefreshCiphertext: bytea('oauth_refresh_ciphertext'),
+    oauthRefreshNonce: bytea('oauth_refresh_nonce'),
+    /** UTC timestamp the access token expires. NULL for non-OAuth credentials. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    sourceNameUnique: uniqueIndex('credentials_source_name_unique').on(t.sourceId, t.name),
+    keyVersionIdx: index('credentials_key_version_idx').on(t.keyVersionId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// credential_access_audit
+// ---------------------------------------------------------------------------
+
+/**
+ * Append-only log of every decrypt (and encrypt/rotate/mark_dead) event.
+ * The observation-log instinct applied to credential access
+ * (architecture-v3 §"Credential and security architecture").
+ */
+export const credentialAccessAudit = pgTable(
+  'credential_access_audit',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    credentialId: uuid('credential_id'),
+    sourceId: text('source_id').notNull(),
+    name: text('name').notNull(),
+    syncRunId: uuid('sync_run_id'),
+    action: credentialActionEnum('action').notNull(),
+    succeeded: boolean('succeeded').notNull(),
+    errorMessage: text('error_message'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    credentialTimeIdx: index('credential_access_audit_credential_time_idx').on(
+      t.credentialId,
+      t.occurredAt.desc(),
+    ),
+    sourceTimeIdx: index('credential_access_audit_source_time_idx').on(
+      t.sourceId,
+      t.occurredAt.desc(),
+    ),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// current_state materialized view (raw SQL)
+// ---------------------------------------------------------------------------
+
 export const currentStateViewSql = sql`
   CREATE MATERIALIZED VIEW IF NOT EXISTS current_state AS
   SELECT DISTINCT ON (entity_id, source, attribute)
@@ -216,12 +283,16 @@ export const currentStateUniqueIndexSql = sql`
 
 export type Entity = typeof entities.$inferSelect;
 export type NewEntity = typeof entities.$inferInsert;
-
 export type SyncRun = typeof syncRuns.$inferSelect;
 export type NewSyncRun = typeof syncRuns.$inferInsert;
-
 export type Observation = typeof observations.$inferSelect;
 export type NewObservation = typeof observations.$inferInsert;
-
+export type KeyVersion = typeof keyVersions.$inferSelect;
+export type NewKeyVersion = typeof keyVersions.$inferInsert;
+export type Credential = typeof credentials.$inferSelect;
+export type NewCredential = typeof credentials.$inferInsert;
+export type CredentialAccessAuditRow = typeof credentialAccessAudit.$inferSelect;
+export type NewCredentialAccessAuditRow = typeof credentialAccessAudit.$inferInsert;
 export type EntityKind = (typeof entityKindEnum.enumValues)[number];
 export type SyncRunStatus = (typeof syncRunStatusEnum.enumValues)[number];
+export type CredentialAction = (typeof credentialActionEnum.enumValues)[number];

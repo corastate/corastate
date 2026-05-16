@@ -1,23 +1,21 @@
 /**
- * Top-level shell. Fetches /v1/devices from the backend and renders a
- * placeholder list. Not the real product UI; this is here to prove the wire
- * is hot from the React app through Fastify to Postgres.
+ * Top-level shell. This structural commit only proves the wire from React →
+ * Fastify → Postgres by polling /internal/healthz; real device + identity
+ * views land in Week 4 (phase-1-sprint-plan-v3.md §"Week 4"). The frontend
+ * is allowed to consume both /v1 and /internal; for diagnostic views,
+ * /internal is the right namespace.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 
+import type { HealthResponse } from '@corastate/contracts';
 import { Button } from '@/components/ui/button';
-import { DeviceList, type Device } from '@/components/DeviceList';
-
-interface DeviceListResponse {
-  items: Device[];
-  total: number;
-}
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type LoadState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'ok'; devices: Device[] }
+  | { kind: 'ok'; health: HealthResponse }
   | { kind: 'error'; message: string };
 
 export function App(): JSX.Element {
@@ -26,12 +24,12 @@ export function App(): JSX.Element {
   const load = useCallback(async (): Promise<void> => {
     setState({ kind: 'loading' });
     try {
-      const res = await fetch('/v1/devices');
+      const res = await fetch('/internal/healthz');
       if (!res.ok) {
         throw new Error(`backend returned ${res.status}`);
       }
-      const body = (await res.json()) as DeviceListResponse;
-      setState({ kind: 'ok', devices: body.items });
+      const body = (await res.json()) as HealthResponse;
+      setState({ kind: 'ok', health: body });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setState({ kind: 'error', message });
@@ -51,20 +49,42 @@ export function App(): JSX.Element {
             <p className="text-sm text-muted-foreground">Device health, joined across tools.</p>
           </div>
           <Button onClick={() => void load()} disabled={state.kind === 'loading'}>
-            {state.kind === 'loading' ? 'Refreshing...' : 'Refresh'}
+            {state.kind === 'loading' ? 'Checking...' : 'Refresh'}
           </Button>
         </div>
       </header>
 
       <main className="container py-6">
         {state.kind === 'idle' && <div className="text-muted-foreground">Loading...</div>}
-        {state.kind === 'loading' && <div className="text-muted-foreground">Loading devices...</div>}
+        {state.kind === 'loading' && (
+          <div className="text-muted-foreground">Checking system health...</div>
+        )}
         {state.kind === 'error' && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm">
             Could not reach the backend: {state.message}
           </div>
         )}
-        {state.kind === 'ok' && <DeviceList devices={state.devices} />}
+        {state.kind === 'ok' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>System health</CardTitle>
+              <CardDescription>
+                The structural scaffold is up. Device and identity views land in Phase 1 Week 4.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm">
+              <div>
+                Status: <span className="font-mono">{state.health.status}</span>
+              </div>
+              <div>
+                Database: <span className="font-mono">{state.health.db}</span>
+              </div>
+              <div>
+                Uptime: <span className="font-mono">{state.health.uptime}s</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

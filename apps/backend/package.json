@@ -7,11 +7,12 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc -b",
-    "typecheck": "tsc -b --noEmit",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@corastate/contracts": "workspace:*",
     "@corastate/core": "workspace:*",
     "@corastate/db": "workspace:*",
     "@fastify/cors": "^9.0.1",
@@ -20,7 +21,8 @@
     "fastify": "^4.28.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
-    "postgres": "^3.4.4"
+    "postgres": "^3.4.4",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

@@ -8,9 +8,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    { "path": "../../packages/db" },
-    { "path": "../../packages/core" }
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

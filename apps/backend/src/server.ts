@@ -1,7 +1,15 @@
 /**
- * Fastify app factory.
+ * Fastify app factory. Split out from index.ts so tests can build a server
+ * without binding a port.
  *
- * Split out from index.ts so tests can build a server without binding a port.
+ * The route layout is the v3-locked structural namespace split
+ * (architecture-v3.md §"API architecture"):
+ *
+ *   /v1/*        Stable, versioned, documented. The public surface.
+ *   /internal/*  Unversioned, frontend-only. Endpoints graduate from here
+ *                to /v1 once their shape is settled.
+ *
+ * One Fastify app, one contracts package, two namespaces.
  */
 
 import cors from '@fastify/cors';
@@ -10,13 +18,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import { createDb, type Database } from '@corastate/db';
 
-import { devicesRoutes } from './routes/devices.js';
-import { healthRoutes } from './routes/health.js';
-import { identitiesRoutes } from './routes/identities.js';
+import { v1Routes } from './routes/v1.js';
+import { internalRoutes } from './routes/internal.js';
 
-/**
- * Anything the route handlers reach for via request.server lives here.
- */
 declare module 'fastify' {
   interface FastifyInstance {
     db: Database;
@@ -43,7 +47,6 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
 
   const app = Fastify({ logger });
 
-  // Database client. Tests pass one in; production builds one from env.
   let db: Database;
   if (options.db) {
     db = options.db;
@@ -62,9 +65,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     credentials: true,
   });
 
-  await app.register(healthRoutes);
-  await app.register(devicesRoutes, { prefix: '/v1' });
-  await app.register(identitiesRoutes, { prefix: '/v1' });
+  await app.register(v1Routes, { prefix: '/v1' });
+  await app.register(internalRoutes, { prefix: '/internal' });
 
   return app;
 }

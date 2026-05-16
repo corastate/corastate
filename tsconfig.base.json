@@ -20,9 +20,7 @@
     "verbatimModuleSyntax": false,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
-    "incremental": true
+    "sourceMap": true
   },
   "exclude": ["node_modules", "dist", "build", ".turbo"]
 }

@@ -6,38 +6,54 @@ Open-core device health aggregation engine. Reads from the endpoint security and
 
 Your IT director knows there are 1247 employees and roughly 1500 endpoints. The CrowdStrike console shows 1389 agents. Intune shows 1102 devices. Okta lists 1247 humans with active sessions in the last 30 days. Jamf shows 612 Macs. Three of those four numbers are wrong, and you have no idea which three until audit week, when someone asks why the laptop assigned to a contractor who left in February is still phoning home from a coffee shop in Lisbon.
 
-The mid-market is stuck on this problem. Above 2500 employees the answer is Axonius or Tanium, which start north of $50K, expect a six-week pro services engagement, and assume you have a security engineering team to keep the integrations alive. Below 250 employees the answer is Fleet plus some bash. In between, you have neither the budget for the first nor the headcount for the second. Kolide was the tool people in this band actually liked, because its user-facing Slack remediation pushed work back onto the employee rather than the IT queue. Since the 1Password acquisition, that product has been folded into something else, and the gap has reopened.
+The mid-market between roughly 250 and 2500 employees has no good answer. Axonius and Tanium start north of $50K and assume a security engineering team. Fleet plus bash is the floor. Kolide sat in the middle and people liked it, and since the 1Password acquisition that gap has reopened. Corastate fills it with a deliberately small surface: five connectors for v1, shipped well. Correlation and gap detection are the product.
 
-Corastate fills that gap with a deliberately smaller surface. Five connectors for v1, shipped well. Correlation and gap detection are the product. The open source core does the ingestion and the read-side queries. A commercial tier adds connectors that talk to enterprise vendors with paid API tiers, and (in v2) the write actions that change state in those tools. v1 surfaces health dimensions you already understand: agent presence, agent recent check-in, OS patch level, disk encryption state, MDM enrollment, EDR running state. The product is what happens when those dimensions are joined across tools: a device in Okta but missing from MDM, a device in CrowdStrike but not Intune, a Jamf Mac with no EDR agent, an Entra-joined Windows device that has not reported home in 11 days.
+## The two layers
+
+Corastate has two layers with different rules. **Connectors are code; correlation rules are config.**
+
+The connector layer talks to vendor APIs: authentication, pagination, rate limits, and reshaping vendor JSON into the canonical schema. That work is code-shaped — branches, retries, vendor quirks no fixed vocabulary captures cleanly. Each connector is a small package, segmented into an auth piece, a fetch+pagination piece, and a mapping piece, built by composing reviewed strategies from a named-strategy registry in `packages/connector-sdk`.
+
+The correlation layer reads the observation log and decides which observations describe the same physical device, which source wins when two sources disagree, and whether a device counts as compliant. That work is config-shaped — a small set of declarative rules an ops lead can tune without a release. The rules live in `configs/correlation.json`, validated at boot against `correlationConfigSchema` in `packages/contracts`.
+
+The boundary between the two layers is the observation log: connectors write observations, the correlation engine reads them, and neither knows how the other is built.
+
+**The authoritative architecture document is [`architecture-v3.md`](https://corastate.com/architecture-v3) (also at `~/Downloads/architecture-v3.md` for contributors).** Read it before changing connector or schema shape; the two load-bearing decisions are the observation-log data model and the segmented code-first connector model.
 
 ## Status
 
-**Phase 1 in progress.** This repository is the scaffold for v1.0.
+**Phase 1 in progress.** This commit is the structural scaffold aligned to architecture-v3. Real feature implementation lands across four sprint weeks per [`phase-1-sprint-plan-v3.md`](https://corastate.com/phase-1-sprint-plan-v3).
 
-What works today:
+What is in the tree today:
 
-- pnpm workspace with backend, web, CLI, and the four shared packages.
-- Postgres 16 in Docker, with Adminer for poking at it.
-- Drizzle schema for `observations`, `entities`, and `sync_runs`. Matches the architecture doc.
-- The connector SDK type contract (`Connector`, `ReadCapability`, `WriteCapability`, `Observation`).
-- Fastify backend that boots, talks to Postgres, and serves `/healthz`, `/v1/devices`, `/v1/identities`.
-- React + Vite + Tailwind + shadcn web shell that fetches devices from the backend.
-- Commander CLI with `migrate`, `sync`, `diagnose` commands.
+- pnpm workspace: backend, web, CLI, contracts, db, core, connector-sdk, and five connector packages (okta + four skeletons).
+- `packages/contracts`: Zod canonical schema for `Device` and `Identity`, the correlation-config shape, and the API request/response shapes.
+- `packages/connector-sdk`: segmented connector skeleton (`defineConnector`, `Connector`, `ConnectorAuth`, `ConnectorFetch`, `ConnectorMapping`) and the named-strategy registry (`AuthStrategy`, `PaginationStrategy`, `NamedStrategyRegistry`).
+- `packages/connector-okta` + `packages/connector-defender` + scaffolded skeletons for CrowdStrike, Intune, Jamf — each laid out as `auth.ts` / `fetch.ts` / `mapping.ts` / `index.ts`. Stubs only; mapping bodies throw NotImplemented until the corresponding sprint week.
+- `packages/db`: Drizzle schema with `observations`, `entities`, `sync_runs`, plus the credential layer (`credentials`, `key_versions`, `credential_access_audit`).
+- `packages/core`: the `KeyProvider` interface with `EnvKeyProvider` (the only Phase 1 implementation per architecture-v3).
+- `apps/backend`: Fastify split into `/v1` (stable, will be public) and `/internal` (unversioned, frontend-only) namespaces, healthz stubs only.
+- `apps/web`: React + Vite + Tailwind + shadcn shell, polling `/internal/healthz` to prove the wire.
+- `apps/cli`: `migrate`, `sync`, `diagnose` commands (placeholders until Week 2).
+- `configs/correlation.json`: empty placeholder, populated Week 3.
 
-What does not work yet:
+What does not work yet (intentionally — comes in the Phase 1 sprint):
 
-- Real connector implementations. Okta is a typed skeleton. CrowdStrike, Intune, Jamf, and the reference Defender connector are not in the tree.
-- The correlation engine. The entity-matching strategy is documented in `packages/core/src/correlate.ts` but not implemented.
-- The partition conversion for the observations table. The generated migration creates a plain table; the daily-partition wrapper is a TODO in `packages/db/src/migrate.ts`.
-- Webhook receiver, digest email, Slack and Teams alert sinks.
+- The sync runner. Connectors are scaffolded; no records flow through them.
+- The correlation engine. Schema and config shape are pinned; the engine lands Week 3.
+- The credential store helpers (envelope encryption, audit writer, OAuth lifecycle). Schema is locked from this commit; implementations land Week 1.
+- Real `/v1/devices` and `/v1/identities` endpoints. Stubs only.
+- The partition conversion for the observations table.
 
-## The 30-minute walkthrough
+## The 30-minute walkthrough (will work at v0.1.0)
+
+This walkthrough lands at the end of Phase 1 Week 4. The structural scaffold below boots; it does not yet show correlated data.
 
 ### Prerequisites
 
-- Node.js 20.11 or newer
-- pnpm 9 or newer (`npm i -g pnpm` if you do not have it)
-- Docker (for Postgres)
+- Node.js 20.11 or newer (mise / nvm / volta all fine)
+- pnpm 10 or newer
+- Docker (Docker Desktop, OrbStack, or any container runtime that speaks `docker compose`)
 
 ### Step 1. Install
 
@@ -57,24 +73,12 @@ Two services come up:
 - Postgres on `localhost:5432`, user `corastate`, password `corastate`, database `corastate`.
 - Adminer on `http://localhost:8081` for browsing the database in a UI.
 
-Verify Postgres is up:
+### Step 3. Apply migrations
 
 ```sh
-docker compose ps
+pnpm db:generate   # writes drizzle/0000_*.sql from the Drizzle schema
+pnpm migrate       # applies migrations + creates the current_state materialized view
 ```
-
-You should see `corastate-postgres` and `corastate-adminer` in state `running` or `healthy`.
-
-### Step 3. Run database migrations
-
-```sh
-pnpm db:generate   # produces drizzle/0000_*.sql from the Drizzle schema
-pnpm migrate       # applies migrations and creates the current_state view
-```
-
-The first command writes a generated SQL migration into `packages/db/drizzle/`. The second applies it.
-
-Note: the partition conversion for the observations table is not in the tree yet. You will see a warning that says so. The schema works as a plain table until that file is added.
 
 ### Step 4. Run the apps
 
@@ -82,21 +86,15 @@ Note: the partition conversion for the observations table is not in the tree yet
 pnpm dev
 ```
 
-This starts the backend, the web app, and the CLI in watch mode. Two ports to know:
+The backend serves at `http://localhost:4000`, the web app at `http://localhost:5173`. Vite proxies `/v1/*` and `/internal/*` through to the backend so CORS is not in play in dev.
 
-- Backend: `http://localhost:4000` (try `curl localhost:4000/healthz`)
-- Web: `http://localhost:5173`
+Verify:
 
-Open `http://localhost:5173` in a browser. You should see the Corastate shell with an empty device list and a Refresh button that round-trips through the backend to Postgres.
+- `curl localhost:4000/v1/healthz` → `{"status":"ok","uptime":N,"db":"ok"}`
+- `curl localhost:4000/internal/healthz` → same shape
+- `http://localhost:5173/` in a browser renders the system-health card
 
-### What you should see
-
-- `GET /healthz` returns `{"status":"ok","uptime":N,"db":"ok"}`.
-- `GET /v1/devices` returns `{"items":[],"total":0}` (because nothing has been synced yet).
-- The web UI says "No devices yet" with a working Refresh button.
-- Adminer at `http://localhost:8081` shows three tables: `observations`, `entities`, `sync_runs`, plus one materialized view `current_state`.
-
-If all four of those check out, the scaffold is up.
+Adminer at `http://localhost:8081` shows three observation-log tables (`observations`, `entities`, `sync_runs`), three credential-layer tables (`credentials`, `key_versions`, `credential_access_audit`), and one materialized view (`current_state`).
 
 ### Tearing down
 
@@ -105,40 +103,33 @@ docker compose down            # stops the containers, keeps the data
 docker compose down -v         # stops and wipes the postgres volume
 ```
 
-## Architecture
+## Deployment topology
 
-The full architecture write-up, including the two load-bearing decisions (observation log over current-state tables, and capability registration over implicit connector contracts), lives at:
+Two shapes, same application, no code paths branch on the deployment.
 
-`/docs/architecture.md` in the canonical repo, or in the long-form post at corastate.com.
+- **Local + self-hosted** (Phase 1 target). Docker Compose brings up Postgres, the API process, the sync worker, and the web app. The master key comes from a `.env` file.
+- **AWS production** (later phase). A Terraform module stands up the same processes on ECS Fargate with Postgres on RDS, the master key coming from an ECS task secret.
 
-The short version:
-
-- One append-only `observations` table. Partitioned by date. Every fact a connector ever reported lives here forever (within the retention window).
-- A `current_state` materialized view computes the most recent value per `(entity, source, attribute)` and is refreshed at the end of every sync run.
-- Connectors register capabilities declaratively. The framework reads the capability set and decides what to ask of the connector. Capabilities not declared do not exist as far as the framework is concerned.
+The `KeyProvider` reads `process.env` either way. Postgres is Postgres. The container image is the same image.
 
 ## Connectors
 
-| Name                | Status        | License      | Capabilities                                |
-| ------------------- | ------------- | ------------ | ------------------------------------------- |
-| Microsoft Defender  | Not started   | Apache-2.0   | reads: devices, agents, compliance          |
-| Okta                | Skeleton only | Apache-2.0\* | reads: identities                           |
-| CrowdStrike Falcon  | Not started   | Commercial   | reads: devices, agents, compliance          |
-| Microsoft Intune    | Not started   | Commercial   | reads: devices, compliance                  |
-| Jamf Pro            | Not started   | Commercial   | reads: devices, compliance                  |
+| Name                    | Status                  | License      | Auth strategy            | Pagination strategy |
+| ----------------------- | ----------------------- | ------------ | ------------------------ | ------------------- |
+| Okta                    | Skeleton — Week 2       | Apache-2.0\* | `staticToken`            | `linkHeader`        |
+| Microsoft Defender      | Skeleton — Week 3       | Apache-2.0   | `oauthClientCredentials` | `odataNextLink`     |
+| CrowdStrike Falcon      | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `cursorParam`       |
+| Microsoft Intune        | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `odataNextLink`     |
+| Jamf Pro                | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `pageNumber`        |
 
-\* The Okta connector lives in the open source tree today because the API tier we need is free. If that changes it moves to the commercial package.
+\* The Okta connector lives in the open source tree because the Okta tier we need is free.
 
-The capability columns describe what each connector will declare once implemented. The framework refuses to call into a code path the connector did not declare.
+Only Okta and Defender are proven end to end in Phase 1; the other three are scaffolded skeletons that show the shape without claiming to work.
 
 ## License
 
-Apache 2.0. See `LICENSE` at the repo root.
+Apache 2.0. See `LICENSE`. Commercial connectors will live in a separate package under a source-available license; the boundary is enforced by the connector framework, not license trickery.
 
-The commercial connectors (CrowdStrike, Intune, Jamf, and future paid-API integrations) ship as a separate npm package under a source-available license, installed alongside this core. The boundary between the two is enforced by the capability registration framework, not by license trickery.
+## Contributing
 
-## How to contribute
-
-Short version: please do. See [CONTRIBUTING.md](./CONTRIBUTING.md) for what is helpful right now and what to leave alone until the v1 surface settles.
-
-The fastest way to influence v1.0 is to email and tell me which fifth connector you would replace Jamf with, and why. Wesley Lakis, wesley at corastate dot com.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Short version: open a discussion before authoring a new connector, because the segmented skeleton has hard shape constraints (architecture-v3 §"How the Phase 3 AI companion fits") and a misshapen connector PR is hard to redirect.

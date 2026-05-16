@@ -14,13 +14,14 @@
   },
   "files": ["src"],
   "scripts": {
-    "build": "tsc -b",
-    "dev": "tsc -b --watch",
-    "typecheck": "tsc -b --noEmit",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@corastate/connector-sdk": "workspace:*",
+    "@corastate/contracts": "workspace:*",
     "@corastate/db": "workspace:*",
     "drizzle-orm": "^0.36.1",
     "pino": "^9.5.0"
