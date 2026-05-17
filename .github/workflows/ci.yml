@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on the same ref when a new commit lands. Keeps PR
+# noise down and CI minutes spent on stale work to a minimum.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '10.33.3'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # license-check — fast, no Node setup needed.
+  # Asserts LICENSE exists at repo root and identifies itself as Apache-2.0.
+  # ---------------------------------------------------------------------------
+  license-check:
+    name: License check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: LICENSE is Apache-2.0
+        run: |
+          test -f LICENSE
+          grep -q "Apache License" LICENSE
+          grep -q "Version 2.0" LICENSE
+
+  # ---------------------------------------------------------------------------
+  # lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  # ---------------------------------------------------------------------------
+  # typecheck
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  # ---------------------------------------------------------------------------
+  # test — runs against a real Postgres service container.
+  # The credential-store round-trip test exercises the schema end-to-end;
+  # mocking it would defeat the point.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: corastate
+          POSTGRES_PASSWORD: corastate
+          POSTGRES_DB: corastate
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U corastate -d corastate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://corastate:corastate@localhost:5432/corastate
+      LOG_LEVEL: warn
+      LOG_PRETTY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Seed .env (job env vars win; this satisfies dotenv-cli's file requirement)
+        run: cp .env.example .env
+      - name: Generate master key for the test process
+        run: echo "CORASTATE_MASTER_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - name: Apply migrations
+        run: pnpm migrate
+      - name: Run tests
+        run: pnpm test
+
+  # ---------------------------------------------------------------------------
+  # build — fast smoke that nothing breaks under `tsc`/`vite build`.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build

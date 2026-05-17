@@ -1,16 +1,17 @@
 /**
- * Standalone migration runner. Invoked by the CLI's `migrate` command and
- * usable on its own with `pnpm --filter @corastate/db run migrate`.
+ * Standalone migration runner. Invoked by `pnpm migrate` and runnable
+ * directly with `pnpm --filter @corastate/db run migrate`.
  *
- * Three steps, in order:
- *   1. Run Drizzle's generated SQL migrations from ./drizzle.
- *   2. Apply the partition conversion (drizzle/0001_partition.sql once it exists).
- *   3. Create or refresh the current_state materialized view.
- *
- * Step 2 is a TODO. The generated migration creates a normal table; the hand
- * rolled file converts it to a partitioned table and creates the first set
- * of daily partitions. Until that file is written, this script logs a warning
- * and continues.
+ * Steps, in order:
+ *   1. Run Drizzle's generated SQL migrations from ./drizzle. As of Phase 1
+ *      Week 1 this includes 0001_observations_partition.sql which converts
+ *      the plain observations table to range-partitioned by day.
+ *   2. Roll the observations partition window forward (today + 7 future
+ *      days). Belt-and-suspenders for installs that haven't wired the
+ *      roll-partitions worker to cron yet.
+ *   3. (Re-)create the current_state materialized view. The partition
+ *      migration drops it; this step re-creates it pointing at the
+ *      partitioned parent table.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import pino from 'pino';
 
 import { createDb } from './client.js';
+import { rollPartitions } from './roll-partitions.js';
 import { currentStateUniqueIndexSql, currentStateViewSql } from './schema.js';
 
 const log = pino({ name: 'migrate', level: process.env.LOG_LEVEL ?? 'info' });
@@ -33,18 +35,20 @@ async function main(): Promise<void> {
   log.info({ migrationsFolder }, 'running drizzle migrations');
   await migrate(db, { migrationsFolder });
 
-  // TODO: apply drizzle/0001_partition.sql once written. The partition
-  // conversion has to be done outside Drizzle's generator and lives as a raw
-  // SQL file alongside the generated migrations.
-  log.warn(
-    'partition conversion step is a TODO. The observations table will work as a plain table until 0001_partition.sql lands.',
-  );
-
-  log.info('creating current_state materialized view (if not exists)');
-  await db.execute(currentStateViewSql);
-  await db.execute(currentStateUniqueIndexSql);
-
+  // Close before invoking rollPartitions — it opens its own connection so it
+  // can also be used as a standalone worker.
   await sql.end();
+
+  log.info('rolling observations partition window forward');
+  await rollPartitions(7);
+
+  // Re-open for the materialized-view DDL. (rollPartitions closed its own.)
+  const { db: db2, sql: sql2 } = createDb();
+  log.info('creating current_state materialized view (if not exists)');
+  await db2.execute(currentStateViewSql);
+  await db2.execute(currentStateUniqueIndexSql);
+  await sql2.end();
+
   log.info('migration complete');
 }
 

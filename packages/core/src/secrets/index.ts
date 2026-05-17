@@ -1,11 +1,11 @@
-// The secrets module. Phase 1 surfaces:
-//   - KeyProvider interface + EnvKeyProvider (this commit)
-//   - encrypt/decrypt helpers using envelope encryption (Phase 1 Week 1)
-//   - credential-access audit writer (Week 1)
-//   - OAuth token lifecycle helpers (Week 1)
-//   - log redaction (Week 1)
-//
-// This commit ships the KeyProvider only; the rest land in the Week 1
-// implementation pass per phase-1-sprint-plan-v3.md.
+// The secrets module. Phase 1 Week 1 surface:
+//   - KeyProvider interface + EnvKeyProvider (env-var, the only Phase 1 impl).
+//   - envelope encrypt/decrypt primitives (AES-256-GCM, AAD-authenticated).
+//   - credential store: putCredential, getCredential (audits decrypt),
+//     rotateMasterKey, markCredentialDead.
+//   - pino redaction config wired into the logger from the start.
 
 export * from './key-provider.js';
+export * from './envelope.js';
+export * from './credential-store.js';
+export * from './redaction.js';

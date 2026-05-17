@@ -17,6 +17,7 @@ import sensible from '@fastify/sensible';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { createDb, type Database } from '@corastate/db';
+import { pinoRedact } from '@corastate/core';
 
 import { v1Routes } from './routes/v1.js';
 import { internalRoutes } from './routes/internal.js';
@@ -36,14 +37,14 @@ export interface BuildServerOptions {
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const pretty = process.env.LOG_PRETTY === '1';
-  const logger =
-    options.logger ??
-    (pretty
-      ? {
-          level: process.env.LOG_LEVEL ?? 'info',
-          transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss.l' } },
-        }
-      : { level: process.env.LOG_LEVEL ?? 'info' });
+  const baseLogger = pretty
+    ? {
+        level: process.env.LOG_LEVEL ?? 'info',
+        transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss.l' } },
+        redact: pinoRedact(),
+      }
+    : { level: process.env.LOG_LEVEL ?? 'info', redact: pinoRedact() };
+  const logger = options.logger ?? baseLogger;
 
   const app = Fastify({ logger });
 

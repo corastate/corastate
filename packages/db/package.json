@@ -31,7 +31,8 @@
     "push": "dotenv -e ../../.env -- drizzle-kit push",
     "studio": "dotenv -e ../../.env -- drizzle-kit studio",
     "migrate": "dotenv -e ../../.env -- tsx src/migrate.ts",
-    "test": "vitest run"
+    "roll-partitions": "dotenv -e ../../.env -- tsx src/roll-partitions.ts",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "drizzle-orm": "^0.36.1",

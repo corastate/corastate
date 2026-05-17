@@ -19,6 +19,12 @@ export interface CreateDbOptions {
   max?: number;
   /** Optional logger; passed through to Drizzle. Default false. */
   logger?: boolean;
+  /**
+   * Surface Postgres NOTICE-level messages. Off by default — the partition
+   * migration's `CREATE TABLE IF NOT EXISTS` emits a NOTICE per skipped
+   * partition, and they're noise rather than signal. Turn on when debugging.
+   */
+  notices?: boolean;
 }
 
 /**
@@ -41,6 +47,7 @@ export function createDb(options: CreateDbOptions = {}): { db: Database; sql: Sq
     types: {
       bigint: postgres.BigInt,
     },
+    onnotice: options.notices === true ? undefined : () => {},
   });
 
   const db = drizzle(sql, { schema, logger: options.logger ?? false });

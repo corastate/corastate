@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "dotenv -e .env -- pnpm -r --parallel --filter=./apps/* run dev",
     "build": "pnpm -r run build",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
     "test": "pnpm -r run test",
@@ -24,6 +24,7 @@
     "db:studio": "pnpm --filter @corastate/db run studio"
   },
   "devDependencies": {
+    "@eslint/js": "^9.13.0",
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^8.12.2",
     "@typescript-eslint/parser": "^8.12.2",
@@ -31,7 +32,8 @@
     "eslint": "^9.13.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.3",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.12.2"
   },
   "packageManager": "pnpm@10.33.3",
   "pnpm": {
