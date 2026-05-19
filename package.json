@@ -12,6 +12,9 @@
   },
   "scripts": {
     "dev": "dotenv -e .env -- pnpm -r --parallel --filter=./apps/* run dev",
+    "worker:dev": "dotenv -e .env -- pnpm --filter @corastate/worker run dev",
+    "backend:dev": "dotenv -e .env -- pnpm --filter @corastate/backend run dev",
+    "web:dev": "dotenv -e .env -- pnpm --filter @corastate/web run dev",
     "build": "pnpm -r run build",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",

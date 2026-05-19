@@ -12,3 +12,4 @@ export * from './pagination.js';
 export * from './mapping.js';
 export * from './connector.js';
 export * from './registry.js';
+export * from './strategies/index.js';

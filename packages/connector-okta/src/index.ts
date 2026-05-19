@@ -1,30 +1,49 @@
-// Okta connector — assembled from the three segmented pieces. The structural
-// commit ships the wiring; Week 2 fills in mapping bodies and points the
-// runner at a real tenant.
+// Okta connector — assembled from the three segmented pieces. The worker
+// builds a per-source instance by calling createOktaConnector(baseUrl); the
+// default export is kept for tests and CLI one-shots.
+//
+// Architecture-v3 §"The first connectors as code": Okta is one of two
+// reference connectors hand-authored as code; the auth and fetch pieces
+// compose registry strategies (`staticToken`, `linkHeader`), and the only
+// per-vendor code is the pure mapping module.
 
-import { defineConnector } from '@corastate/connector-sdk';
+import { defineConnector, type Connector } from '@corastate/connector-sdk';
 
 import { oktaAuth } from './auth.js';
 import { oktaFetch } from './fetch.js';
 import { oktaMapping } from './mapping.js';
 
-/**
- * Default tenant URL is a placeholder; the worker overrides via configured
- * connector settings before invoking the runner.
- */
-const DEFAULT_BASE_URL = 'https://example.okta.com';
+export interface OktaConnectorOptions {
+  /** Per-tenant base URL, e.g. https://acme.okta.com. */
+  baseUrl: string;
+  /** Override the connector version. Defaults to package version. */
+  version?: string;
+}
 
-export const oktaConnector = defineConnector({
-  identity: {
-    id: 'okta',
-    displayName: 'Okta',
-    version: '0.1.0',
-  },
-  auth: oktaAuth,
-  fetch: oktaFetch(DEFAULT_BASE_URL),
-  mapping: oktaMapping,
-});
+export function createOktaConnector(options: OktaConnectorOptions): Connector {
+  return defineConnector({
+    identity: {
+      id: 'okta',
+      displayName: 'Okta',
+      version: options.version ?? '0.1.0',
+    },
+    auth: oktaAuth,
+    fetch: oktaFetch(options.baseUrl),
+    mapping: oktaMapping,
+  });
+}
+
+/**
+ * Default connector instance with a placeholder base URL. The worker uses
+ * `createOktaConnector` instead so it can thread the per-source URL through.
+ */
+export const oktaConnector = createOktaConnector({ baseUrl: 'https://example.okta.com' });
 
 export { oktaAuth } from './auth.js';
 export { oktaFetch } from './fetch.js';
-export { oktaMapping, mapOktaUserToIdentity, type OktaUser } from './mapping.js';
+export {
+  oktaMapping,
+  mapOktaUserToIdentity,
+  normalizeOktaStatus,
+  type OktaUser,
+} from './mapping.js';

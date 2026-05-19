@@ -40,6 +40,21 @@ export interface EndpointSpec {
   entityKind: 'device' | 'identity';
   /** Initial query params, if any. */
   initialParams?: Record<string, string>;
+  /**
+   * Dot-path inside the JSON response body to the items array. Omitted when
+   * the response body is itself the array (the Okta shape). The runner uses
+   * it to enumerate raw records before mapping. Examples:
+   *   undefined         — body is `[record, record, …]`
+   *   'value'           — Microsoft Graph: `{ value: [...], '@odata.nextLink': '...' }`
+   *   'resources'       — CrowdStrike: `{ resources: [...], meta: {...} }`
+   *   'results.records' — nested
+   */
+  itemsField?: string;
+  /**
+   * Source-record id field on each raw record. Used to write observations
+   * idempotently per source record. Default 'id'.
+   */
+  idField?: string;
 }
 
 /**

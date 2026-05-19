@@ -13,3 +13,5 @@
  */
 
 export * from './secrets/index.js';
+export * from './observations/index.js';
+export * from './sync/index.js';

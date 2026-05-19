@@ -30,6 +30,14 @@ services:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: pepa-linha
 
+  # Worker, backend, and web service definitions land in Week 4 alongside the
+  # 30-minute clone-to-data path (phase-1-sprint-plan-v3.md §"Week 4"). The
+  # Phase 1 dev loop today is `pnpm dev`, which spawns the three apps locally
+  # against the dockerized Postgres above. Architecture-v3 §"Credential and
+  # security architecture" locks the rule that the worker is the only process
+  # holding the master key; that boundary is already in place (only the
+  # worker reads CORASTATE_MASTER_KEY) regardless of where each process runs.
+
 volumes:
   corastate_pgdata:
     driver: local

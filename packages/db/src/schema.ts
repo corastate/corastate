@@ -83,6 +83,38 @@ export const entities = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// sources
+// ---------------------------------------------------------------------------
+
+/**
+ * Configured sources per install. A source binds a connector (by id, e.g.
+ * 'okta') to its per-install config (e.g. baseUrl) and to credentials. The
+ * Phase 1 model is single-tenant, so one source per connector is the common
+ * case, but the schema supports multiple — e.g. two Okta orgs.
+ *
+ * Credentials are keyed by (sources.id::text, name), so each configured
+ * source carries its own credential set. last_synced_at / status come from
+ * joining against sync_runs by source_id.
+ */
+export const sources = pgTable(
+  'sources',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    connectorId: text('connector_id').notNull(),
+    displayName: text('display_name').notNull(),
+    /** Connector-specific config (baseUrl, page size overrides, etc.). */
+    config: jsonb('config').notNull().default({}).$type<Record<string, unknown>>(),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    connectorIdx: index('sources_connector_id_idx').on(t.connectorId),
+    activeIdx: index('sources_active_idx').on(t.active),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // sync_runs
 // ---------------------------------------------------------------------------
 
@@ -90,6 +122,7 @@ export const syncRuns = pgTable(
   'sync_runs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    sourceId: uuid('source_id'),
     connectorId: text('connector_id').notNull(),
     connectorVersion: text('connector_version').notNull(),
     status: syncRunStatusEnum('status').notNull().default('running'),
@@ -105,6 +138,7 @@ export const syncRuns = pgTable(
       t.startedAt.desc(),
     ),
     statusIdx: index('sync_runs_status_idx').on(t.status),
+    sourceIdx: index('sync_runs_source_id_idx').on(t.sourceId, t.startedAt.desc()),
   }),
 );
 
@@ -283,6 +317,8 @@ export const currentStateUniqueIndexSql = sql`
 
 export type Entity = typeof entities.$inferSelect;
 export type NewEntity = typeof entities.$inferInsert;
+export type Source = typeof sources.$inferSelect;
+export type NewSource = typeof sources.$inferInsert;
 export type SyncRun = typeof syncRuns.$inferSelect;
 export type NewSyncRun = typeof syncRuns.$inferInsert;
 export type Observation = typeof observations.$inferSelect;

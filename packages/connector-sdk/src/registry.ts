@@ -5,6 +5,16 @@
 
 import type { AuthStrategy } from './auth.js';
 import type { PaginationStrategy } from './pagination.js';
+import {
+  staticTokenStrategy,
+  oauthClientCredentialsStrategy,
+} from './strategies/index.js';
+import {
+  linkHeaderStrategy,
+  odataNextLinkStrategy,
+  cursorParamStrategy,
+  pageNumberStrategy,
+} from './strategies/index.js';
 
 export interface NamedStrategyRegistry {
   readonly auth: ReadonlyMap<string, AuthStrategy<unknown>>;
@@ -44,11 +54,22 @@ export function registerPagination<TParams>(
 }
 
 /**
- * The Phase-1 default registry. Empty in this commit; Week 2 lands
- * `staticToken` + `oauthClientCredentials` + `linkHeader` + `odataNextLink`
- * here.
+ * Build the Phase 1 default registry. Each call returns a fresh registry so
+ * tests can mutate without contaminating other tests.
  */
-export const defaultRegistry: NamedStrategyRegistry = createRegistry();
+export function buildDefaultRegistry(): MutableRegistry {
+  const reg = createRegistry();
+  registerAuth(reg, staticTokenStrategy);
+  registerAuth(reg, oauthClientCredentialsStrategy);
+  registerPagination(reg, linkHeaderStrategy);
+  registerPagination(reg, odataNextLinkStrategy);
+  registerPagination(reg, cursorParamStrategy);
+  registerPagination(reg, pageNumberStrategy);
+  return reg;
+}
+
+/** Process-wide default registry. The runner reads from here. */
+export const defaultRegistry: NamedStrategyRegistry = buildDefaultRegistry();
 
 /** Strategy names the Phase 1 plan commits to shipping. */
 export const PLANNED_AUTH_STRATEGIES = ['staticToken', 'oauthClientCredentials'] as const;
