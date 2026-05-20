@@ -24,7 +24,12 @@ export function oktaFetch(baseUrl: string): ConnectorFetch<OktaLinkHeaderParams>
         entityKind: 'identity',
         initialParams: { limit: '200' },
       },
-      // Devices endpoint lands when the Okta connector goes real (Week 2).
+      {
+        name: 'devices',
+        path: '/api/v1/devices',
+        entityKind: 'device',
+        initialParams: { limit: '200' },
+      },
     ],
     incremental: {
       cursorField: 'lastUpdated',

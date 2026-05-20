@@ -10,10 +10,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import { createHealthzPlugin } from './healthz.js';
 import { sourcesRoutes } from './v1/sources.js';
 import { identitiesRoutes } from './v1/identities.js';
+import { devicesRoutes } from './v1/devices.js';
 
 export const v1Routes: FastifyPluginAsync = async (app) => {
   await app.register(createHealthzPlugin());
   await app.register(sourcesRoutes);
   await app.register(identitiesRoutes);
-  // TODO(week-3): /v1/devices, /v1/devices/:id, /v1/identities/:id
+  await app.register(devicesRoutes);
+  // TODO(week-4): /v1/devices/:id, /v1/identities/:id detail views
 };

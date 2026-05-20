@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@corastate/connector-defender": "workspace:*",
     "@corastate/connector-okta": "workspace:*",
     "@corastate/connector-sdk": "workspace:*",
     "@corastate/contracts": "workspace:*",

@@ -44,6 +44,8 @@ export { oktaFetch } from './fetch.js';
 export {
   oktaMapping,
   mapOktaUserToIdentity,
+  mapOktaDevice,
   normalizeOktaStatus,
+  type OktaDevice,
   type OktaUser,
 } from './mapping.js';

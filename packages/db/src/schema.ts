@@ -290,6 +290,57 @@ export const credentialAccessAudit = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// canonical_devices
+// ---------------------------------------------------------------------------
+
+/**
+ * Cross-source merged device. The correlation engine reads observations
+ * grouped by entity_id, applies the configured match rules to collapse
+ * per-source views, and upserts one row here per resulting group.
+ *
+ * `match_key` is the natural key the engine uses to keep the upsert
+ * idempotent across runs: the normalized serial number when the group has
+ * one, otherwise a synthetic key derived from hostname or source-record
+ * (`HOSTNAME-<HN>`, `UNKNOWN-<source>-<record-id>`). Re-running the engine
+ * over the same observations produces the same `match_key` set and so the
+ * same canonical row ids.
+ *
+ * `source_entity_ids` lists every per-source entity row that contributed
+ * to this canonical device — provenance for the Phase 2 unmerge UI.
+ */
+export const canonicalDevices = pgTable(
+  'canonical_devices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    matchKey: text('match_key').notNull(),
+    hostname: text('hostname'),
+    serialNumber: text('serial_number'),
+    hardwareUuid: text('hardware_uuid'),
+    azureAdDeviceId: text('azure_ad_device_id'),
+    macAddresses: jsonb('mac_addresses').notNull().default([]).$type<string[]>(),
+    osVersion: text('os_version'),
+    diskEncryption: boolean('disk_encryption'),
+    mdmEnrolled: boolean('mdm_enrolled'),
+    agentRunning: boolean('agent_running'),
+    ownerEmail: text('owner_email'),
+    lastCheckIn: timestamp('last_check_in', { withTimezone: true }),
+    sources: jsonb('sources').notNull().default([]).$type<string[]>(),
+    missingFrom: jsonb('missing_from').notNull().default([]).$type<string[]>(),
+    sourceLastSeen: jsonb('source_last_seen')
+      .notNull()
+      .default({})
+      .$type<Record<string, string>>(),
+    sourceEntityIds: jsonb('source_entity_ids').notNull().default([]).$type<string[]>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    matchKeyUnique: uniqueIndex('canonical_devices_match_key_unique').on(t.matchKey),
+    updatedAtIdx: index('canonical_devices_updated_at_idx').on(t.updatedAt.desc(), t.id.desc()),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // current_state materialized view (raw SQL)
 // ---------------------------------------------------------------------------
 
@@ -329,6 +380,8 @@ export type Credential = typeof credentials.$inferSelect;
 export type NewCredential = typeof credentials.$inferInsert;
 export type CredentialAccessAuditRow = typeof credentialAccessAudit.$inferSelect;
 export type NewCredentialAccessAuditRow = typeof credentialAccessAudit.$inferInsert;
+export type CanonicalDevice = typeof canonicalDevices.$inferSelect;
+export type NewCanonicalDevice = typeof canonicalDevices.$inferInsert;
 export type EntityKind = (typeof entityKindEnum.enumValues)[number];
 export type SyncRunStatus = (typeof syncRunStatusEnum.enumValues)[number];
 export type CredentialAction = (typeof credentialActionEnum.enumValues)[number];

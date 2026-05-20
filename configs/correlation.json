@@ -1,1 +1,26 @@
-{}
+{
+  "matchPriority": [
+    { "field": "serialNumber", "normalize": "lowercase+trim" },
+    { "field": "azureAdDeviceId", "normalize": "lowercase+trim" },
+    { "field": "hostname", "normalize": "lowercase+trim" },
+    { "field": "hostname", "composite": ["serialNumber"], "normalize": "lowercase+trim" },
+    { "field": "macAddresses", "normalize": "lowercase+trim" },
+    { "field": "ownerEmail", "composite": ["hostname"], "normalize": "lowercase+trim" }
+  ],
+  "sourcePriority": {
+    "hostname": ["intune", "defender", "jamf", "crowdstrike", "okta"],
+    "serialNumber": ["intune", "defender", "jamf", "crowdstrike", "okta"],
+    "azureAdDeviceId": ["intune", "defender"],
+    "osVersion": ["intune", "defender", "jamf", "crowdstrike", "okta"],
+    "diskEncryption": ["intune", "defender", "jamf"],
+    "mdmEnrolled": ["intune", "defender", "jamf", "okta"],
+    "ownerEmail": ["intune", "defender", "okta", "crowdstrike", "jamf"]
+  },
+  "compliance": [
+    {
+      "name": "orphaned",
+      "description": "No MDM source has the device.",
+      "when": { "allOf": [{ "notIn": ["intune", "defender", "jamf"], "path": "sources" }] }
+    }
+  ]
+}

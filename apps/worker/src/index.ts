@@ -16,7 +16,13 @@ import { sql } from 'drizzle-orm';
 import pino from 'pino';
 
 import { createDb, sources, type Source } from '@corastate/db';
-import { EnvKeyProvider, pinoRedact, runSync } from '@corastate/core';
+import {
+  EnvKeyProvider,
+  loadCorrelationConfig,
+  pinoRedact,
+  runCorrelation,
+  runSync,
+} from '@corastate/core';
 import { eq } from 'drizzle-orm';
 
 import { buildConnector } from './connector-factory.js';
@@ -51,9 +57,25 @@ async function tick(log: pino.Logger): Promise<void> {
     }
 
     const keyProvider = new EnvKeyProvider();
+    let anySyncSucceeded = false;
 
     for (const source of active) {
-      await syncOneSource(log, db, keyProvider, source);
+      const ok = await syncOneSource(log, db, keyProvider, source);
+      if (ok) anySyncSucceeded = true;
+    }
+
+    // Post-sync correlation. Idempotent: rerunning on the same observations
+    // produces the same canonical_devices rows (the match_key upsert keeps
+    // ids stable). We only kick it off when at least one sync succeeded so
+    // a degenerate tick doesn't churn the canonical table.
+    if (anySyncSucceeded) {
+      try {
+        const config = await loadCorrelationConfig();
+        const result = await runCorrelation({ db, config, log });
+        log.info({ result }, 'worker: correlation complete');
+      } catch (err) {
+        log.error({ err }, 'worker: correlation failed');
+      }
     }
   } finally {
     await pg.end();
@@ -65,7 +87,7 @@ async function syncOneSource(
   db: ReturnType<typeof createDb>['db'],
   keyProvider: EnvKeyProvider,
   source: Source,
-): Promise<void> {
+): Promise<boolean> {
   const child = log.child({
     sourceId: source.id,
     connectorId: source.connectorId,
@@ -84,8 +106,10 @@ async function syncOneSource(
       log: child,
     });
     child.info({ result }, 'worker: source sync succeeded');
+    return true;
   } catch (err) {
     child.error({ err }, 'worker: source sync failed');
+    return false;
   }
 }
 

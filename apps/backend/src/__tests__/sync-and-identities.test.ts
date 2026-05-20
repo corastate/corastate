@@ -55,8 +55,9 @@ beforeAll(() => {
 
 afterAll(async () => {
   if (!db) return;
-  // Clean every row we created. The order respects FK-free relationships
-  // (observations references sync_runs.sync_run_id by value, not FK).
+  // Clean every row we created. Scope by sync_run_id and source-id so we
+  // don't trample observations or credentials owned by tests running in
+  // parallel against the same database.
   const ourRuns = await db
     .select({ id: syncRuns.id, sourceId: syncRuns.sourceId })
     .from(syncRuns)
@@ -72,22 +73,21 @@ afterAll(async () => {
   const ourSources = await db.select().from(sources);
   for (const s of ourSources) {
     if (!s.displayName.includes(SOURCE_TEST_TAG)) continue;
-    // Clean entities created during this source's syncs.
-    await db.delete(observations).where(eq(observations.source, 'okta'));
-    // Clean credentials + audits keyed by this source's id (text-stringified).
     await db
       .delete(credentialAccessAudit)
       .where(eq(credentialAccessAudit.sourceId, s.id));
     await db.delete(credentials).where(eq(credentials.sourceId, s.id));
     await db.delete(sources).where(eq(sources.id, s.id));
   }
-  // Entities created by tests are best-effort cleaned via cascading the
-  // observations.source='okta' delete above; a stray entities row is
-  // harmless across runs because each test uses a unique source uuid.
+  // Entities and observations rows that the deleted sync runs produced are
+  // intentionally left in place. Each test uses a unique source uuid so
+  // stray rows do not contaminate later runs, and a hard delete here would
+  // race against any concurrent test that shares the `okta` source id.
   if (pg) await pg.end();
   delete process.env[envVarName];
   void keyVersions;
   void entities;
+  void observations;
   void TEST_CONNECTOR_ID;
 });
 

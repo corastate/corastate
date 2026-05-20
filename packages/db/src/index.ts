@@ -21,6 +21,7 @@ export {
   credentials,
   credentialAccessAudit,
   credentialActionEnum,
+  canonicalDevices,
   currentStateViewSql,
   currentStateUniqueIndexSql,
   type Entity,
@@ -40,4 +41,6 @@ export {
   type CredentialAccessAuditRow,
   type NewCredentialAccessAuditRow,
   type CredentialAction,
+  type CanonicalDevice,
+  type NewCanonicalDevice,
 } from './schema.js';

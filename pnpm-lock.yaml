@@ -75,6 +75,9 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      '@corastate/connector-defender':
+        specifier: workspace:*
+        version: link:../../packages/connector-defender
       '@corastate/connector-okta':
         specifier: workspace:*
         version: link:../../packages/connector-okta
@@ -194,6 +197,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@corastate/connector-defender':
+        specifier: workspace:*
+        version: link:../../packages/connector-defender
       '@corastate/connector-okta':
         specifier: workspace:*
         version: link:../../packages/connector-okta

@@ -37,6 +37,12 @@ export const deviceSchema = z.object({
     .describe('Disk encryption enabled (BitLocker on Windows, FileVault on macOS).'),
   mdmEnrolled: z.boolean().nullable().describe('Enrolled in an MDM (Intune, Jamf, etc.).'),
   agentRunning: z.boolean().nullable().describe('EDR agent is reporting in.'),
+  ownerEmail: z
+    .string()
+    .nullable()
+    .describe(
+      'Best-effort owner email, picked across sources by configured priority. Null if no source observed an owner.',
+    ),
   lastCheckIn: z
     .coerce.date()
     .nullable()
@@ -49,6 +55,9 @@ export const deviceSchema = z.object({
     .describe(
       'Source ids that should have this device per the correlation rules but do not. The gap signal.',
     ),
+  sourceLastSeen: z
+    .record(z.coerce.date())
+    .describe('Per-source last-seen timestamp, keyed by source id. Survives cross-source merges.'),
 });
 
 export type Device = z.infer<typeof deviceSchema>;

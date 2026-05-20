@@ -7,7 +7,7 @@ import type {
   ConnectorMapping,
   MappingFn,
 } from '@corastate/connector-sdk';
-import type { IdentityPartial, IdentityStatus } from '@corastate/contracts';
+import type { DevicePartial, IdentityPartial, IdentityStatus } from '@corastate/contracts';
 
 /**
  * Subset of the Okta user payload the mapping uses. The full payload has ~40
@@ -105,6 +105,60 @@ const mapOktaUserToIdentityWithExtras: MappingFn<OktaUser, IdentityPartial> = (r
   return { ...base, ...extras } as IdentityPartial;
 };
 
+/**
+ * Subset of Okta's `/api/v1/devices` payload the mapping uses. The endpoint
+ * returns a small set of fields per device under `profile` plus an outer
+ * `id` and timestamps. Reference:
+ *   https://developer.okta.com/docs/reference/api/devices/
+ */
+export interface OktaDevice {
+  id: string;
+  status?: string | null;
+  created?: string | null;
+  lastUpdated?: string | null;
+  resourceType?: string | null;
+  profile: {
+    displayName?: string | null;
+    platform?: string | null;
+    osVersion?: string | null;
+    serialNumber?: string | null;
+    udid?: string | null;
+    imei?: string | null;
+    meid?: string | null;
+    manufacturer?: string | null;
+    model?: string | null;
+    diskEncryptionType?: string | null;
+    registered?: boolean | null;
+  };
+}
+
+function joinPlatform(platform: string | null | undefined, version: string | null | undefined): string | null {
+  const parts = [platform, version].filter((p): p is string => typeof p === 'string' && p.length > 0);
+  if (parts.length === 0) return null;
+  return parts.join(' ').trim();
+}
+
+export const mapOktaDevice: MappingFn<OktaDevice, DevicePartial> = (raw) => {
+  const profile = raw.profile ?? ({} as OktaDevice['profile']);
+  const serialRaw = typeof profile.serialNumber === 'string' && profile.serialNumber.trim().length > 0
+    ? profile.serialNumber.trim().toUpperCase()
+    : null;
+  const partial: DevicePartial = {
+    hostname: profile.displayName ?? null,
+    serialNumber: serialRaw,
+    hardwareUuid: profile.udid && profile.udid.length > 0 ? profile.udid : null,
+    osVersion: joinPlatform(profile.platform, profile.osVersion),
+    mdmEnrolled: typeof profile.registered === 'boolean' ? profile.registered : null,
+    lastCheckIn: raw.lastUpdated ? parseDate(raw.lastUpdated) : null,
+    sources: ['okta'],
+  };
+  if (typeof profile.diskEncryptionType === 'string' && profile.diskEncryptionType.length > 0) {
+    partial.diskEncryption = profile.diskEncryptionType.toUpperCase() !== 'NONE';
+  }
+  return partial;
+};
+
 export const oktaMapping: ConnectorMapping = {
   identity: mapOktaUserToIdentityWithExtras as MappingFn<unknown, IdentityPartial>,
+  device: mapOktaDevice as MappingFn<unknown, DevicePartial>,
 };
