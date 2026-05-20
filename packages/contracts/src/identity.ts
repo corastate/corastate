@@ -32,3 +32,21 @@ export type Identity = z.infer<typeof identitySchema>;
 
 export const identityPartialSchema = identitySchema.partial();
 export type IdentityPartial = z.infer<typeof identityPartialSchema>;
+
+/**
+ * List-row shape for /v1/identities. Extends the canonical Identity with
+ * a derived `deviceCount` — how many correlated devices the identity owns.
+ * Kept separate from the canonical record so non-list call sites don't
+ * carry a field the source observations never emit.
+ */
+export const identityListItemSchema = identitySchema.extend({
+  deviceCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe(
+      'Derived: count of canonical_devices whose owner_email matches this identity.',
+    ),
+});
+
+export type IdentityListItem = z.infer<typeof identityListItemSchema>;

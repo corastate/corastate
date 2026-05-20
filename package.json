@@ -22,6 +22,8 @@
     "test": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
     "migrate": "pnpm --filter @corastate/db run migrate",
+    "seed": "dotenv -e .env -- pnpm --filter @corastate/cli exec tsx src/index.ts seed",
+    "test:ui": "pnpm --filter @corastate/web run test:ui",
     "db:generate": "pnpm --filter @corastate/db run generate",
     "db:push": "pnpm --filter @corastate/db run push",
     "db:studio": "pnpm --filter @corastate/db run studio"

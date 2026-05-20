@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import path from 'node:path';
 
 import react from '@vitejs/plugin-react';
@@ -26,5 +27,11 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    // Playwright tests live under tests/ and use their own runner.
+    // vitest only runs unit tests under src/, which today is empty.
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['tests/**', 'node_modules/**', 'dist/**', 'test-results/**'],
   },
 });

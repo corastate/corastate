@@ -1,6 +1,6 @@
 # Corastate
 
-Open-core device health aggregation engine. Reads from the endpoint security and MDM tools you already pay for, correlates devices across those tools, ties identities to devices, and surfaces the gaps. Read-only in v1.
+Open-core device health aggregation. Reads from the endpoint security and MDM tools you already pay for, correlates devices across those tools, ties identities to devices, and surfaces the gaps. Read-only in v1.
 
 ## What this is
 
@@ -12,89 +12,117 @@ The mid-market between roughly 250 and 2500 employees has no good answer. Axoniu
 
 Corastate has two layers with different rules. **Connectors are code; correlation rules are config.**
 
-The connector layer talks to vendor APIs: authentication, pagination, rate limits, and reshaping vendor JSON into the canonical schema. That work is code-shaped — branches, retries, vendor quirks no fixed vocabulary captures cleanly. Each connector is a small package, segmented into an auth piece, a fetch+pagination piece, and a mapping piece, built by composing reviewed strategies from a named-strategy registry in `packages/connector-sdk`.
+The connector layer talks to vendor APIs: authentication, pagination, rate limits, and reshaping vendor JSON into the canonical schema. That work is code-shaped, with branches, retries, and vendor quirks no fixed vocabulary captures cleanly. Each connector is a small package, segmented into an auth piece, a fetch + pagination piece, and a mapping piece, built by composing reviewed strategies from a named-strategy registry in `packages/connector-sdk`.
 
-The correlation layer reads the observation log and decides which observations describe the same physical device, which source wins when two sources disagree, and whether a device counts as compliant. That work is config-shaped — a small set of declarative rules an ops lead can tune without a release. The rules live in `configs/correlation.json`, validated at boot against `correlationConfigSchema` in `packages/contracts`.
+The correlation layer reads the observation log and decides which observations describe the same physical device, which source wins when two sources disagree, and whether a device counts as compliant. That work is config-shaped, a small set of declarative rules an ops lead can tune without a release. The rules live in `configs/correlation.json`, validated at boot against `correlationConfigSchema` in `packages/contracts`.
 
 The boundary between the two layers is the observation log: connectors write observations, the correlation engine reads them, and neither knows how the other is built.
 
-**The authoritative architecture document is [`architecture-v3.md`](https://corastate.com/architecture-v3) (also at `~/Downloads/architecture-v3.md` for contributors).** Read it before changing connector or schema shape; the two load-bearing decisions are the observation-log data model and the segmented code-first connector model.
+**The authoritative architecture document is [`architecture-v3.md`](https://corastate.com/architecture-v3).** Read it before changing connector or schema shape; the two load-bearing decisions are the observation-log data model and the segmented code-first connector model.
 
-## Status
+## What v1 does
 
-**Phase 1 in progress.** This commit is the structural scaffold aligned to architecture-v3. Real feature implementation lands across four sprint weeks per [`phase-1-sprint-plan-v3.md`](https://corastate.com/phase-1-sprint-plan-v3).
+- Polls Okta and Microsoft Defender on a schedule, pulls users and devices, normalizes them into the canonical schema.
+- Correlates per-source observations into one canonical device per physical box, using rules from `configs/correlation.json`.
+- Surfaces three read-only views in a web UI: **Devices** (with source pills, health flags, missing-from gaps), **Identities** (with device count), and **Sources** (with last-sync time and status).
+- Exposes the same data on a stable `/v1/*` HTTP API (`/v1/devices`, `/v1/identities`, `/v1/sources`).
 
-What is in the tree today:
+## What v1 does NOT do
 
-- pnpm workspace: backend, web, CLI, contracts, db, core, connector-sdk, and five connector packages (okta + four skeletons).
-- `packages/contracts`: Zod canonical schema for `Device` and `Identity`, the correlation-config shape, and the API request/response shapes.
-- `packages/connector-sdk`: segmented connector skeleton (`defineConnector`, `Connector`, `ConnectorAuth`, `ConnectorFetch`, `ConnectorMapping`) and the named-strategy registry (`AuthStrategy`, `PaginationStrategy`, `NamedStrategyRegistry`).
-- `packages/connector-okta` + `packages/connector-defender` + scaffolded skeletons for CrowdStrike, Intune, Jamf — each laid out as `auth.ts` / `fetch.ts` / `mapping.ts` / `index.ts`. Stubs only; mapping bodies throw NotImplemented until the corresponding sprint week.
-- `packages/db`: Drizzle schema with `observations`, `entities`, `sync_runs`, plus the credential layer (`credentials`, `key_versions`, `credential_access_audit`).
-- `packages/core`: the `KeyProvider` interface with `EnvKeyProvider` (the only Phase 1 implementation per architecture-v3).
-- `apps/backend`: Fastify split into `/v1` (stable, will be public) and `/internal` (unversioned, frontend-only) namespaces, healthz stubs only.
-- `apps/web`: React + Vite + Tailwind + shadcn shell, polling `/internal/healthz` to prove the wire.
-- `apps/cli`: `migrate`, `sync`, `diagnose` commands (placeholders until Week 2).
-- `configs/correlation.json`: empty placeholder, populated Week 3.
+- No write actions, no remediation. Read-only.
+- No remediation prompts, ticket creation, or webhooks to external tools.
+- No correlation-editing UI. Match keys and source priorities are edited in `configs/correlation.json` and reloaded on worker restart.
+- No commercial connectors (CrowdStrike, Intune, Jamf). The packages are scaffolded but the mapping bodies throw `NotImplemented`. Those land in a separate source-available tier.
+- No multi-tenant isolation. Single-tenant installs only; one Postgres database per company.
+- No AWS Terraform module. The deployment path today is `docker compose up`; the production module lands in Phase 3.
 
-What does not work yet (intentionally — comes in the Phase 1 sprint):
+## The 30-minute clone-to-data walkthrough
 
-- The sync runner. Connectors are scaffolded; no records flow through them.
-- The correlation engine. Schema and config shape are pinned; the engine lands Week 3.
-- The credential store helpers (envelope encryption, audit writer, OAuth lifecycle). Schema is locked from this commit; implementations land Week 1.
-- Real `/v1/devices` and `/v1/identities` endpoints. Stubs only.
-- The partition conversion for the observations table.
+A stranger should be able to get from `git clone` to a populated UI in well under 30 minutes. On a machine with the toolchain warm and the Postgres image cached, the walkthrough is closer to **5 minutes**; on a cold machine pulling `pnpm install` (~285 packages) and `postgres:16-alpine` (~80MB), budget **15 to 20 minutes**.
 
-## The 30-minute walkthrough (will work at v0.1.0)
-
-This walkthrough lands at the end of Phase 1 Week 4. The structural scaffold below boots; it does not yet show correlated data.
+The walkthrough below uses a seeded demo data set so no real Okta or Defender tenant is required.
 
 ### Prerequisites
 
-- Node.js 20.11 or newer (mise / nvm / volta all fine)
-- pnpm 10 or newer
-- Docker (Docker Desktop, OrbStack, or any container runtime that speaks `docker compose`)
+- Node.js 20.11 or newer (mise, nvm, or volta all fine)
+- pnpm 10 or newer (`corepack enable && corepack prepare pnpm@10 --activate`)
+- Docker (Docker Desktop, OrbStack, or any runtime that speaks `docker compose`)
 
-### Step 1. Install
+### Step 1. Install dependencies (1-3 min)
 
 ```sh
 pnpm install
 ```
 
-### Step 2. Bring up Postgres
+### Step 2. Bring up Postgres (5 sec to 1 min)
 
 ```sh
 cp .env.example .env
 docker compose up -d
 ```
 
-Two services come up:
+This starts Postgres on `localhost:5432` and Adminer on `http://localhost:8081`.
 
-- Postgres on `localhost:5432`, user `corastate`, password `corastate`, database `corastate`.
-- Adminer on `http://localhost:8081` for browsing the database in a UI.
-
-### Step 3. Apply migrations
+The `.env` file already points at the dockerized Postgres. The credential store uses a master key for envelope-encrypted secrets; generate one and append it:
 
 ```sh
-pnpm db:generate   # writes drizzle/0000_*.sql from the Drizzle schema
-pnpm migrate       # applies migrations + creates the current_state materialized view
+echo "CORASTATE_MASTER_KEY=$(openssl rand -base64 32)" >> .env
 ```
 
-### Step 4. Run the apps
+The master key is only read by the sync worker (architecture-v3 §"Credential and security architecture"). The API process never sees it.
+
+### Step 3. Apply migrations (~2 sec)
+
+```sh
+pnpm migrate
+```
+
+This runs the Drizzle migrations, converts `observations` to a range-partitioned table, rolls the partition window forward 7 days, and creates the `current_state` materialized view.
+
+### Step 4. Load demo data (~2 sec)
+
+```sh
+pnpm seed
+```
+
+This writes:
+
+- Two demo sources (`Okta (demo)` and `Defender (demo)`, both marked inactive so the worker does not try to poll them).
+- 20 identities (Okta side only, since Defender does not emit identities).
+- 30 devices, with overlap: 18 are seen by both sources (correlation completes them), 6 are Defender-only (Okta gap), 6 are Okta-only (Defender gap). The Defender gap and Okta gap are what the **Missing from** column in the Devices view surfaces.
+- The correlation engine runs over the new observations and writes 30 rows to `canonical_devices`.
+
+Re-running `pnpm seed --reset` truncates the demo data first for a clean slate.
+
+### Step 5. Boot the apps (~10 sec)
 
 ```sh
 pnpm dev
 ```
 
-The backend serves at `http://localhost:4000`, the web app at `http://localhost:5173`. Vite proxies `/v1/*` and `/internal/*` through to the backend so CORS is not in play in dev.
+This spawns three processes in parallel:
 
-Verify:
+- **Backend** on `http://localhost:4000` (Fastify, serves `/v1/*` and `/internal/*`).
+- **Web app** on `http://localhost:5173` (Vite, proxies `/v1/*` and `/internal/*` to the backend).
+- **Worker** with the polling loop. The demo sources are inactive, so it sleeps after one tick.
 
-- `curl localhost:4000/v1/healthz` → `{"status":"ok","uptime":N,"db":"ok"}`
-- `curl localhost:4000/internal/healthz` → same shape
-- `http://localhost:5173/` in a browser renders the system-health card
+Open `http://localhost:5173` in a browser. The Devices view loads with 30 correlated devices, the Identities view with 20 people, and the Sources view with the two demo sources showing `succeeded`. The Health view at `/#/health` rounds it out.
 
-Adminer at `http://localhost:8081` shows three observation-log tables (`observations`, `entities`, `sync_runs`), three credential-layer tables (`credentials`, `key_versions`, `credential_access_audit`), and one materialized view (`current_state`).
+### Step 6. Verify the API (~10 sec)
+
+```sh
+curl -s 'http://localhost:4000/v1/devices?limit=3' | jq '.items[0]'
+curl -s http://localhost:4000/v1/sources | jq .
+curl -s http://localhost:4000/internal/healthz | jq .
+```
+
+### Step 7. Optional, run the UI smoke tests (~10 sec)
+
+```sh
+pnpm test:ui
+```
+
+Playwright boots the backend + web (or reuses your existing `pnpm dev`), navigates each of the four views, and asserts the data surface renders. Screenshots land in `apps/web/test-results/`.
 
 ### Tearing down
 
@@ -103,12 +131,16 @@ docker compose down            # stops the containers, keeps the data
 docker compose down -v         # stops and wipes the postgres volume
 ```
 
+## Architecture in one paragraph
+
+The web app and the Fastify backend share the `packages/contracts` Zod schemas; every API response is validated on both sides. The backend reads from the database, never from a connector directly. The sync worker is the only process holding the master key; it polls active sources, runs each connector's `runSync` against the observation log, and after every batch the correlation engine collapses cross-source observations into `canonical_devices` by configured match keys. The CLI offers operator commands (`migrate`, `seed`, `sync`, `diagnose`). See `architecture-v3.md` for the full picture and the load-bearing decisions.
+
 ## Deployment topology
 
 Two shapes, same application, no code paths branch on the deployment.
 
-- **Local + self-hosted** (Phase 1 target). Docker Compose brings up Postgres, the API process, the sync worker, and the web app. The master key comes from a `.env` file.
-- **AWS production** (later phase). A Terraform module stands up the same processes on ECS Fargate with Postgres on RDS, the master key coming from an ECS task secret.
+- **Local + self-hosted** (Phase 1 target). Docker Compose brings up Postgres; backend, worker, and web run as Node processes. The master key comes from a `.env` file.
+- **AWS production** (Phase 3). A Terraform module stands up the same processes on ECS Fargate with Postgres on RDS, the master key coming from an ECS task secret.
 
 The `KeyProvider` reads `process.env` either way. Postgres is Postgres. The container image is the same image.
 
@@ -116,15 +148,35 @@ The `KeyProvider` reads `process.env` either way. Postgres is Postgres. The cont
 
 | Name                    | Status                  | License      | Auth strategy            | Pagination strategy |
 | ----------------------- | ----------------------- | ------------ | ------------------------ | ------------------- |
-| Okta                    | Skeleton — Week 2       | Apache-2.0\* | `staticToken`            | `linkHeader`        |
-| Microsoft Defender      | Skeleton — Week 3       | Apache-2.0   | `oauthClientCredentials` | `odataNextLink`     |
+| Okta                    | Authored (Phase 1)      | Apache-2.0\* | `staticToken`            | `linkHeader`        |
+| Microsoft Defender      | Authored (Phase 1)      | Apache-2.0   | `oauthClientCredentials` | `odataNextLink`     |
 | CrowdStrike Falcon      | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `cursorParam`       |
 | Microsoft Intune        | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `odataNextLink`     |
 | Jamf Pro                | Scaffold, not authored  | Commercial   | `oauthClientCredentials` | `pageNumber`        |
 
-\* The Okta connector lives in the open source tree because the Okta tier we need is free.
+\* The Okta connector lives in the open source tree because the Okta tier needed is free.
 
-Only Okta and Defender are proven end to end in Phase 1; the other three are scaffolded skeletons that show the shape without claiming to work.
+Only Okta and Defender are proven end to end in Phase 1; the other three are scaffolded skeletons that show the shape without claiming to work. Real CrowdStrike, Intune, and Jamf land in a separate commercial tier.
+
+## Repository layout
+
+```
+apps/
+  backend/     Fastify API (/v1, /internal)
+  web/         React + Vite + Tailwind + shadcn SPA
+  worker/      Polling sync runner, only process with the master key
+  cli/         Operator CLI: migrate, seed, sync, diagnose
+packages/
+  contracts/   Zod canonical schema (Device, Identity, API shapes)
+  connector-sdk/    defineConnector + named strategy registry
+  connector-okta/        Authored
+  connector-defender/    Authored
+  connector-crowdstrike, connector-intune, connector-jamf/  Scaffolds
+  core/        Sync runner, correlation engine, observation writer, secrets
+  db/          Drizzle schema + migrate runner + partition roll
+configs/
+  correlation.json   Match keys, source priorities, compliance rules
+```
 
 ## License
 
@@ -132,4 +184,4 @@ Apache 2.0. See `LICENSE`. Commercial connectors will live in a separate package
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Short version: open a discussion before authoring a new connector, because the segmented skeleton has hard shape constraints (architecture-v3 §"How the Phase 3 AI companion fits") and a misshapen connector PR is hard to redirect.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Short version: open a discussion before authoring a new connector. The segmented skeleton has hard shape constraints (architecture-v3 §"How the Phase 3 AI companion fits") and a misshapen connector PR is hard to redirect.

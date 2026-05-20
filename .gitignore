@@ -145,3 +145,8 @@ vite.config.ts.timestamp-*
 # Claude Code local state
 .claude/settings.local.json
 .claude/worktrees/
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/

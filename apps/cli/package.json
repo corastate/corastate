@@ -15,6 +15,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@corastate/contracts": "workspace:*",
     "@corastate/core": "workspace:*",
     "@corastate/db": "workspace:*",
     "commander": "^12.1.0",

@@ -14,6 +14,11 @@ export default [
       '**/dist/**',
       '**/build/**',
       '**/.turbo/**',
+      // Claude Code worktrees: sibling copies of the repo for parallel agents.
+      '.claude/worktrees/**',
+      // Playwright artifacts.
+      'apps/web/test-results/**',
+      'apps/web/playwright-report/**',
       // Generated migration artifacts.
       'packages/db/drizzle/**',
       // Config and infra files — not part of the typecheck graph.

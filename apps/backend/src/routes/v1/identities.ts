@@ -22,7 +22,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   cursorPageQuerySchema,
   identityListResponseSchema,
-  type Identity,
+  type IdentityListItem,
   type IdentityListResponse,
 } from '@corastate/contracts';
 
@@ -82,6 +82,35 @@ export const identitiesRoutes: FastifyPluginAsync = async (app) => {
       attrs: Record<string, unknown>;
     }>;
 
+    // Device count is derived from canonical_devices.owner_email.
+    // Computed in one query per page (not per row) so we don't fan out into
+    // N+1 selects when listing 50 identities. The list of emails is built
+    // into the IN clause via sql.join — postgres.js doesn't bind JS arrays
+    // to PG `text[]` cleanly through Drizzle, so an explicit list keeps the
+    // generated SQL straightforward.
+    const emailsLowercased: string[] = [];
+    for (const row of candidates) {
+      const email = stringOrNull(row.attrs?.email);
+      if (email) emailsLowercased.push(email.toLowerCase());
+    }
+    const deviceCountByEmail = new Map<string, number>();
+    if (emailsLowercased.length > 0) {
+      const inList = sql.join(emailsLowercased.map((e) => sql`${e}`), sql.raw(', '));
+      const countRows = (await app.db.execute(sql<{
+        owner_email: string;
+        n: string | number;
+      }>`
+        SELECT lower(owner_email) AS owner_email, COUNT(*) AS n
+        FROM canonical_devices
+        WHERE owner_email IS NOT NULL
+          AND lower(owner_email) IN (${inList})
+        GROUP BY lower(owner_email)
+      `)) as unknown as Array<{ owner_email: string; n: string | number }>;
+      for (const r of countRows) {
+        deviceCountByEmail.set(r.owner_email, Number(r.n));
+      }
+    }
+
     const hasMore = candidates.length > limit;
     const page = hasMore ? candidates.slice(0, limit) : candidates;
     const nextCursor = hasMore
@@ -91,7 +120,7 @@ export const identitiesRoutes: FastifyPluginAsync = async (app) => {
         })
       : null;
 
-    const items: Identity[] = [];
+    const items: IdentityListItem[] = [];
     for (const row of page) {
       const attrs = row.attrs ?? {};
       const email = stringOrNull(attrs.email);
@@ -108,6 +137,7 @@ export const identitiesRoutes: FastifyPluginAsync = async (app) => {
         lastLogin: parseDate(stringOrNull(attrs.lastLogin)),
         sources: stringArrayOr(attrs.sources, []),
         vendorIds: vendorIdsOr(attrs.vendorIds, {}),
+        deviceCount: deviceCountByEmail.get(email.toLowerCase()) ?? 0,
       });
     }
 
@@ -164,7 +194,7 @@ function vendorIdsOr(v: unknown, fallback: Record<string, string>): Record<strin
   return fallback;
 }
 
-function parseStatus(raw: string | null): Identity['status'] {
+function parseStatus(raw: string | null): IdentityListItem['status'] {
   if (raw === 'active' || raw === 'suspended' || raw === 'deactivated' || raw === 'unknown') {
     return raw;
   }

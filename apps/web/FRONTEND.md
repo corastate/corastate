@@ -2,7 +2,7 @@
 
 Engineer-facing rules for [`apps/web/`](./), curated from the Claude skills installed under [`.claude/skills/`](../../.claude/skills/) and tailored to Corastate's stack. The Claude-facing index of those skills lives in [`.claude/SKILLS.md`](../../.claude/SKILLS.md).
 
-This document has two halves: forward-looking rules to apply when Week 4 product views land, and a frozen audit of the **Week 2 shell** that becomes stale the moment real `/v1/devices` and `/v1/identities` views start landing. Treat the audit as a snapshot, not a living document.
+Week 4 has shipped: TanStack Query is in, the three product views render, and Playwright smoke tests boot the stack and assert each view. The rules below stay forward-looking; the Week-2 shell audit further down is preserved as a frozen reference for what the diagnostic-only shell looked like.
 
 ## Stack baseline
 
@@ -25,13 +25,13 @@ The `vercel-composition-patterns` skill ([`.claude/skills/composition-patterns/r
 
 React 19 is not yet in use — `forwardRef` is still required by our React 18 components. When we upgrade, see `react19-no-forwardref`.
 
-### Data fetching (decide before Week 4)
+### Data fetching
 
-The shell's manual `useState` + `useEffect` + try/catch pattern in [`src/App.tsx:22-41`](./src/App.tsx) is acceptable **only** for `/internal/*` diagnostic surfaces. Product views (`/v1/devices`, `/v1/identities`) need parallelisation, request dedup, retry, and cache — all of which `vercel-react-best-practices` calls out as critical (see rules `async-parallel`, `client-swr-dedup`, `async-cheap-condition-before-await`, `async-defer-await`).
+**TanStack Query.** Decision shipped Week 4. The provider is wired in [`src/main.tsx`](./src/main.tsx), the typed fetchers + `queryOptions` factories live in [`src/lib/api.ts`](./src/lib/api.ts), and the three product views consume them via `useQuery`. Adding a new view: write the fetcher, expose a `queryOptions` factory next to it, call `useQuery(myThingQuery(params))` in the view.
 
-**Recommended:** [**TanStack Query**](https://tanstack.com/query/latest). It matches the skill's parallel/dedup/cache rules without locking us into Next.js-specific patterns (RSC, `cache()`, server actions) that don't exist in a Vite SPA. Alternatives considered: SWR (lighter, but weaker mutation story for connector-status writes later), raw `useSyncExternalStore` wrappers (full control, but reinvents caching and dedup).
+Alternatives considered before the call: SWR (lighter but weaker mutation story for connector-status writes later), raw `useSyncExternalStore` wrappers (full control but reinvents caching and dedup). The `vercel-react-best-practices` rules `async-parallel`, `client-swr-dedup`, `async-cheap-condition-before-await`, and `async-defer-await` motivated the move off the manual `useState` + `useEffect` pattern.
 
-Whatever the choice, do **not** propagate the `useState` + `useEffect` pattern to product views. Pick the library, write one example fetch, and convert at the start of Week 4.
+Do not introduce a parallel data-fetching primitive for product views. The diagnostic Health view originally polled `/internal/healthz` with `useState` + `useEffect` and was migrated alongside; new diagnostic surfaces should follow suit.
 
 ### Re-render hygiene (applies once lists exist)
 
@@ -51,9 +51,11 @@ Only one rule worth enforcing on day one:
 
 ## Testing approach
 
-The [`webapp-testing`](../../.claude/skills/webapp-testing/) skill provides a Playwright-based harness with a black-box server-lifecycle script (`scripts/with_server.py`). It is **latent today** — no `apps/web/tests/` directory, no Playwright config.
+Playwright is wired. Config in [`playwright.config.ts`](./playwright.config.ts) (boots backend + web via `webServer`), tests in [`tests/smoke.spec.ts`](./tests/smoke.spec.ts). Run via `pnpm test:ui` from any directory.
 
-Scaffold under `apps/web/tests/` at the **start of Week 4**, not now: there is exactly one screen and one state worth testing today, and webapp-testing's reconnaissance-then-action pattern is overkill for it. The skill activates automatically the moment a Playwright config exists.
+The current suite is deliberately thin: each view renders, navigation works, the API contract isn't broken. Pagination, search, and the empty states are uncovered today; add coverage when those flows start hosting load-bearing behaviour, not pre-emptively.
+
+The Vitest unit-test directory under `src/` is empty; component unit tests should sit beside the component they cover when they exist.
 
 ## Shell audit — Week 2 snapshot
 
@@ -67,12 +69,12 @@ Frozen on the date of this commit. Becomes stale at Week 4 start.
 - ℹ️ **No error reporter, no analytics, no console capture** — by design at Phase 1. The ErrorBoundary deliberately does not log to a backend yet; React's default behaviour already surfaces stack traces in dev. Revisit when product views ship.
 - ℹ️ **No retry/backoff on fetch errors** — the header "Refresh" button is the entire retry surface today. Sufficient for one diagnostic endpoint; not sufficient for product views.
 
-## Action items (deferred, surfaced)
+## Action items (status)
 
-1. **Pick a data-fetching library before Week 4 starts.** Recommend TanStack Query; the comparison is in "Data fetching" above. Decision affects every `/v1/*` view and should land as a one-PR baseline before any view code.
-2. **Scaffold Playwright at Week 4 start**, not earlier. Use the `webapp-testing` skill's `scripts/with_server.py` as the runner; first test should be the device-list happy path.
-3. **Audit ESLint config against `vercel-react-best-practices` lint-encodable rules.** Several can be enforced statically: `rerender-no-inline-components` (custom rule), `bundle-barrel-imports` (`eslint-plugin-import` `no-restricted-imports`), various `js-*` rules. Open a tracking issue when Week 3 lands and the connector surface stops moving.
-4. **Revisit `claude-api` and `mcp-builder` skill applicability at Phase 1 close.** If Phase 3's AI companion implies Anthropic SDK use in product, the `claude-api` skill activates. If we expose Corastate over MCP, `mcp-builder` activates. Neither applies today.
+1. ✅ **Pick a data-fetching library before Week 4 starts.** TanStack Query landed Week 4. See "Data fetching" above.
+2. ✅ **Scaffold Playwright at Week 4 start.** `apps/web/playwright.config.ts` + `apps/web/tests/smoke.spec.ts` run via `pnpm test:ui`. The `@playwright/test` runner replaces the `with_server.py` shape that the webapp-testing skill suggests; `webServer` in the config gives the same end-to-end lifecycle without the Python bridge.
+3. ⏳ **Audit ESLint config against `vercel-react-best-practices` lint-encodable rules.** Several can be enforced statically: `rerender-no-inline-components` (custom rule), `bundle-barrel-imports` (`eslint-plugin-import` `no-restricted-imports`), various `js-*` rules. Open a tracking issue at Phase 2 start.
+4. ⏳ **Revisit `claude-api` and `mcp-builder` skill applicability at Phase 1 close.** If Phase 3's AI companion implies Anthropic SDK use in product, the `claude-api` skill activates. If Corastate exposes MCP, `mcp-builder` activates. Neither applies today.
 
 ## Out of scope
 

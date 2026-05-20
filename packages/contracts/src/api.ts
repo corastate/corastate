@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { deviceSchema } from './device.js';
-import { identitySchema } from './identity.js';
+import { identityListItemSchema } from './identity.js';
 
 export const healthResponseSchema = z
   .object({
@@ -78,7 +78,7 @@ export const cursorPageQuerySchema = z.object({
 export type CursorPageQuery = z.infer<typeof cursorPageQuerySchema>;
 
 export const identityListResponseSchema = z.object({
-  items: z.array(identitySchema),
+  items: z.array(identityListItemSchema),
   nextCursor: z.string().nullable().describe('Cursor for the next page, or null if exhausted.'),
 });
 

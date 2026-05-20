@@ -11,20 +11,20 @@ The architecture is locked in [`architecture-v3.md`](https://corastate.com/archi
 
 ## What helps right now
 
-Sprint-aligned, in priority order:
+Phase 1 is feature-complete: Okta and Defender connectors work end to end, correlation is wired, the three read-only views render, the Playwright smoke tests pass, and the 30-minute walkthrough is real. The honest priorities for the next sliver of work:
 
-1. **Reference auth + pagination strategies** in `packages/connector-sdk`: `staticToken`, `oauthClientCredentials`, `linkHeader`, `odataNextLink`. The Phase 3 AI companion will compose connectors out of these by name, so the contracts must be precise and the tests thorough.
-2. **The Okta connector mapping** — the pure functions in `packages/connector-okta/src/mapping.ts`. The auth and fetch pieces already compose registry strategies; only the mapping is per-vendor.
-3. **The credential store** in `packages/core/src/secrets/`: envelope encryption helpers using AES-256-GCM, the credential-access audit writer, log redaction. The schema is already locked from the first migration.
-4. **The correlation engine** in `packages/core` (Week 3 work): ported from the prototype's `correlator.py`, driven by `configs/correlation.json` validated against `correlationConfigSchema`.
-5. **The observations table partition conversion** — one hand-rolled SQL file in `packages/db/drizzle/` that turns the plain table into a range-partitioned one and pre-creates a window of daily partitions.
+1. **A second authored connector beyond Defender.** Anything in `connector-crowdstrike`, `connector-intune`, or `connector-jamf` whose mapping body still throws `NotImplemented`. Open a discussion first; only Okta and Defender are reviewed for the SDK boundary today.
+2. **Better Playwright coverage.** The smoke tests in `apps/web/tests/smoke.spec.ts` are deliberately thin: each view renders, nav works. Pagination, search, and the empty states are still uncovered.
+3. **Vitest unit coverage.** The correlation engine has tests in `packages/core/src/correlate/*.test.ts`; the connectors and the credential store have less. New tests should sit next to the code they cover.
+4. **Re-run the 30-minute walkthrough on a fresh machine** and report any step that surprised you. The walkthrough is the gate; surprises are bugs.
 
 ## What does not help right now
 
-- A second commercial connector before the Defender reference works. Real connectors are how we stress-test the SDK; one is enough for now.
+- A write or remediation surface. v1 is read-only; that is a deliberate cut, not an oversight.
+- A correlation-editing UI. Phase 2 work; the rules ship as `configs/correlation.json` today.
 - Adding fields to the canonical schema in `packages/contracts` without a connector that needs them. Schema is the spine; it grows when a real use case forces it.
-- A rules engine, remediation, or write actions. v1 is read-only on purpose.
-- Replacing the observation log with current-state tables. Read architecture-v3 §"The observation-log data model" — that decision is load-bearing.
+- Replacing the observation log with current-state tables. Read architecture-v3 §"The observation-log data model"; that decision is load-bearing.
+- Replacing TanStack Query with anything else. The decision is recorded in `apps/web/FRONTEND.md`; redo it via a discussion, not a PR.
 
 ## Style
 
