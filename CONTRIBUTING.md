@@ -33,6 +33,7 @@ Sprint-aligned, in priority order:
 - Imports use `.js` extensions for local files (Node ESM convention), even though the source files are `.ts`.
 - Workspace packages export from `./src/*.ts`, not `./dist/*.js`, so tsx and vite resolve them without a pre-build. `tsc -b` still emits `dist/` for typecheck and publishable packages later.
 - Prettier and ESLint run in CI. `pnpm format` and `pnpm lint` locally before opening a PR.
+- Frontend conventions live in [`apps/web/FRONTEND.md`](apps/web/FRONTEND.md).
 
 ## Tests
 
