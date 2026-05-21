@@ -30,6 +30,11 @@
       "types": "./src/api.ts",
       "import": "./src/api.ts",
       "default": "./src/api.ts"
+    },
+    "./overview": {
+      "types": "./src/overview.ts",
+      "import": "./src/overview.ts",
+      "default": "./src/overview.ts"
     }
   },
   "files": ["src"],

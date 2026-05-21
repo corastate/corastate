@@ -12,12 +12,14 @@ import { useRoute } from '@/lib/router';
 import { DevicesView } from '@/views/DevicesView';
 import { HealthView } from '@/views/HealthView';
 import { IdentitiesView } from '@/views/IdentitiesView';
+import { OverviewView } from '@/views/OverviewView';
 import { SourcesView } from '@/views/SourcesView';
 
 export function App(): JSX.Element {
   const route = useRoute();
   return (
     <AppShell>
+      {route === 'overview' && <OverviewView />}
       {route === 'devices' && <DevicesView />}
       {route === 'identities' && <IdentitiesView />}
       {route === 'sources' && <SourcesView />}

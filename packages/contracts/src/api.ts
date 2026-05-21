@@ -84,9 +84,71 @@ export const identityListResponseSchema = z.object({
 
 export type IdentityListResponse = z.infer<typeof identityListResponseSchema>;
 
+/**
+ * Filter + sort surface for /v1/devices.
+ *
+ * Multi-valued filters are encoded as comma-separated lists so the URL stays
+ * shareable and the contract stays consistent with the simple "?key=val" form.
+ * The web client splits the URL search params back into arrays before posting
+ * them; both ends agree on the encoding here.
+ */
+export const deviceSortFieldSchema = z.enum([
+  'updatedAt',
+  'hostname',
+  'ownerEmail',
+  'osVersion',
+  'sourceCount',
+  'lastCheckIn',
+]);
+export type DeviceSortField = z.infer<typeof deviceSortFieldSchema>;
+
+export const sortDirectionSchema = z.enum(['asc', 'desc']);
+export type SortDirection = z.infer<typeof sortDirectionSchema>;
+
+const csvList = z
+  .string()
+  .min(1)
+  .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean));
+
+export const deviceComplianceFilterSchema = z.enum(['healthy', 'at_risk', 'unknown']);
+export type DeviceComplianceFilter = z.infer<typeof deviceComplianceFilterSchema>;
+
+const boolish = z
+  .union([z.boolean(), z.string()])
+  .transform((v) => {
+    if (typeof v === 'boolean') return v;
+    return v === 'true' || v === '1';
+  });
+
+export const deviceListQuerySchema = cursorPageQuerySchema.extend({
+  sources: csvList.optional().describe('Connector ids the device must be present in.'),
+  missingFrom: csvList.optional().describe('Connector ids the device must be missing from.'),
+  compliance: csvList
+    .optional()
+    .describe('Subset of healthy / at_risk / unknown — devices outside the set are excluded.'),
+  platform: csvList
+    .optional()
+    .describe(
+      'Coarse OS platform buckets: macos / windows / linux / other. Matched case-insensitively against os_version.',
+    ),
+  hasGaps: boolish.optional().describe('When true, only devices with a non-empty missing_from.'),
+  staleOnly: boolish
+    .optional()
+    .describe('When true, only devices whose last_check_in exceeds the staleness threshold.'),
+  sort: deviceSortFieldSchema.optional().default('updatedAt'),
+  dir: sortDirectionSchema.optional().default('desc'),
+});
+export type DeviceListQuery = z.infer<typeof deviceListQuerySchema>;
+
 export const deviceListResponseSchema = z.object({
   items: z.array(deviceSchema),
   nextCursor: z.string().nullable(),
+  total: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe('Total matching rows after filters but before pagination. Omitted on cursor pages > 1.'),
 });
 
 export type DeviceListResponse = z.infer<typeof deviceListResponseSchema>;

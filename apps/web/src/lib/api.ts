@@ -15,10 +15,15 @@ import {
   deviceListResponseSchema,
   healthResponseSchema,
   identityListResponseSchema,
+  overviewResponseSchema,
   sourceListResponseSchema,
+  type DeviceComplianceFilter,
   type DeviceListResponse,
+  type DeviceSortField,
   type HealthResponse,
   type IdentityListResponse,
+  type OverviewResponse,
+  type SortDirection,
   type SourceListResponse,
 } from '@corastate/contracts';
 
@@ -55,7 +60,18 @@ export interface CursorPageParams {
   q?: string;
 }
 
-function withQuery(path: string, params: CursorPageParams): string {
+export interface DeviceListParams extends CursorPageParams {
+  sources?: string[];
+  missingFrom?: string[];
+  compliance?: DeviceComplianceFilter[];
+  platform?: string[];
+  hasGaps?: boolean;
+  staleOnly?: boolean;
+  sort?: DeviceSortField;
+  dir?: SortDirection;
+}
+
+function withCursorQuery(path: string, params: CursorPageParams): string {
   const url = new URL(path, window.location.origin);
   if (params.limit !== undefined) url.searchParams.set('limit', String(params.limit));
   if (params.cursor) url.searchParams.set('cursor', params.cursor);
@@ -63,20 +79,48 @@ function withQuery(path: string, params: CursorPageParams): string {
   return `${url.pathname}${url.search}`;
 }
 
+function withDevicesQuery(params: DeviceListParams): string {
+  const url = new URL('/v1/devices', window.location.origin);
+  if (params.limit !== undefined) url.searchParams.set('limit', String(params.limit));
+  if (params.cursor) url.searchParams.set('cursor', params.cursor);
+  if (params.q) url.searchParams.set('q', params.q);
+  if (params.sources && params.sources.length > 0) {
+    url.searchParams.set('sources', params.sources.join(','));
+  }
+  if (params.missingFrom && params.missingFrom.length > 0) {
+    url.searchParams.set('missingFrom', params.missingFrom.join(','));
+  }
+  if (params.compliance && params.compliance.length > 0) {
+    url.searchParams.set('compliance', params.compliance.join(','));
+  }
+  if (params.platform && params.platform.length > 0) {
+    url.searchParams.set('platform', params.platform.join(','));
+  }
+  if (params.hasGaps) url.searchParams.set('hasGaps', 'true');
+  if (params.staleOnly) url.searchParams.set('staleOnly', 'true');
+  if (params.sort) url.searchParams.set('sort', params.sort);
+  if (params.dir) url.searchParams.set('dir', params.dir);
+  return `${url.pathname}${url.search}`;
+}
+
 export function getHealth(): Promise<HealthResponse> {
   return getJson('/internal/healthz', healthResponseSchema);
 }
 
-export function getDevices(params: CursorPageParams = {}): Promise<DeviceListResponse> {
-  return getJson(withQuery('/v1/devices', params), deviceListResponseSchema);
+export function getDevices(params: DeviceListParams = {}): Promise<DeviceListResponse> {
+  return getJson(withDevicesQuery(params), deviceListResponseSchema);
 }
 
 export function getIdentities(params: CursorPageParams = {}): Promise<IdentityListResponse> {
-  return getJson(withQuery('/v1/identities', params), identityListResponseSchema);
+  return getJson(withCursorQuery('/v1/identities', params), identityListResponseSchema);
 }
 
 export function getSources(): Promise<SourceListResponse> {
   return getJson('/v1/sources', sourceListResponseSchema);
+}
+
+export function getOverview(): Promise<OverviewResponse> {
+  return getJson('/v1/overview', overviewResponseSchema);
 }
 
 // queryOptions factories — co-located with the fetchers so call sites stay
@@ -89,12 +133,19 @@ export const healthQuery = () =>
     staleTime: 10_000,
   });
 
-export const devicesQuery = (params: CursorPageParams) =>
+export const devicesQuery = (params: DeviceListParams) =>
   queryOptions({
     queryKey: ['devices', params] as const,
     queryFn: () => getDevices(params),
     staleTime: 5_000,
     placeholderData: (prev) => prev,
+  });
+
+export const overviewQuery = () =>
+  queryOptions({
+    queryKey: ['overview'] as const,
+    queryFn: () => getOverview(),
+    staleTime: 10_000,
   });
 
 export const identitiesQuery = (params: CursorPageParams) =>

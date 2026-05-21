@@ -4,7 +4,7 @@
  * navigation chrome stays visible while a long table scrolls.
  */
 
-import { Activity, Boxes, Plug, Users } from 'lucide-react';
+import { Activity, Boxes, LayoutDashboard, Plug, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { navigate, useRoute, type Route } from '@/lib/router';
@@ -16,6 +16,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { route: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { route: 'devices', label: 'Devices', Icon: Boxes },
   { route: 'identities', label: 'Identities', Icon: Users },
   { route: 'sources', label: 'Sources', Icon: Plug },

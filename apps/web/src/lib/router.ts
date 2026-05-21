@@ -10,13 +10,13 @@
 
 import { useSyncExternalStore } from 'react';
 
-export const routes = ['devices', 'identities', 'sources', 'health'] as const;
+export const routes = ['overview', 'devices', 'identities', 'sources', 'health'] as const;
 export type Route = (typeof routes)[number];
 
-const DEFAULT_ROUTE: Route = 'devices';
+const DEFAULT_ROUTE: Route = 'overview';
 
 function parseHash(hash: string): Route {
-  const value = hash.replace(/^#\/?/, '');
+  const value = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
   return (routes as readonly string[]).includes(value) ? (value as Route) : DEFAULT_ROUTE;
 }
 
@@ -40,4 +40,28 @@ export function useRoute(): Route {
 export function navigate(route: Route): void {
   if (parseHash(window.location.hash) === route) return;
   window.location.hash = `#/${route}`;
+}
+
+/**
+ * Read the query string off the hash, e.g. `#/devices?sources=okta-demo`.
+ * The hash router keeps the section after `?` for view-local state — the
+ * filterable report serializes its facets here.
+ */
+export function getHashQuery(): URLSearchParams {
+  const hash = window.location.hash;
+  const q = hash.indexOf('?');
+  if (q < 0) return new URLSearchParams();
+  return new URLSearchParams(hash.slice(q + 1));
+}
+
+/** Replace the hash query string for the current route without re-navigating. */
+export function setHashQuery(params: URLSearchParams): void {
+  const route = parseHash(window.location.hash);
+  const search = params.toString();
+  const next = search ? `#/${route}?${search}` : `#/${route}`;
+  if (window.location.hash !== next) {
+    history.replaceState(null, '', next);
+    // history.replaceState doesn't fire hashchange, so notify subscribers.
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  }
 }
