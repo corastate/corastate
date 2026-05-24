@@ -24,7 +24,14 @@ import {
   PageHeaderTitle,
 } from '@/components/PageHeader';
 import { QueryBoundary } from '@/components/QueryBoundary';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { identitiesQuery } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
@@ -47,7 +54,9 @@ export function IdentitiesView(): JSX.Element {
     [currentCursor, debouncedQuery],
   );
 
-  const { data, isPending, isError, error, isFetching, refetch } = useQuery(identitiesQuery(params));
+  const { data, isPending, isError, error, isFetching, refetch } = useQuery(
+    identitiesQuery(params),
+  );
 
   const onQueryChange = (value: string): void => {
     setQuery(value);
@@ -60,8 +69,8 @@ export function IdentitiesView(): JSX.Element {
         <div>
           <PageHeaderTitle>Identities</PageHeaderTitle>
           <PageHeaderDescription>
-            People as the directory sees them. Device count is how many correlated devices share
-            the identity's email.
+            People as the directory sees them. Device count is how many correlated devices share the
+            identity's email.
           </PageHeaderDescription>
         </div>
         <PageHeaderActions>
@@ -83,7 +92,12 @@ export function IdentitiesView(): JSX.Element {
         </PageHeaderActions>
       </PageHeader>
 
-      <QueryBoundary isPending={isPending} isError={isError} error={error} onRetry={() => void refetch()}>
+      <QueryBoundary
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+      >
         {data ? (
           <IdentitiesTable
             identities={data.items}
@@ -120,14 +134,17 @@ function IdentitiesTable({
 }: IdentitiesTableProps): JSX.Element {
   if (identities.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground" data-testid="identities-empty">
+      <div
+        className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground"
+        data-testid="identities-empty"
+      >
         No identities match. Run a sync (or <code>pnpm seed</code>) and refresh.
       </div>
     );
   }
   return (
     <>
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border border-border bg-card">
         <Table data-testid="identities-table">
           <TableHeader>
             <TableRow>

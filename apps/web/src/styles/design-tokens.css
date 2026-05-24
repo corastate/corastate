@@ -1,0 +1,164 @@
+/* ============================================================
+   Corastate / Caper shared design tokens
+   Accent: Sienna. Neutrals: warm grey. Mood: calm, warm, premium.
+   One source of truth. Same file in both apps so they match.
+
+   Conventions:
+   - Accent is used ONLY on primary actions, active nav, links,
+     and focused-metric highlights. Everything else is neutral.
+   - Status colors are deliberately kept clear of the accent:
+     critical is a COOL crimson (separates from warm sienna by hue),
+     high/medium/low/info follow convention.
+   - The focused-metric highlight is a LEFT-BORDER only (no warm
+     fill) so it never competes with the amber "high" badge.
+
+   Dark mode overrides are triggered by a `.dark` class on the
+   root element (manual toggle). Upstream PDS uses a
+   prefers-color-scheme media query; this app adapts it to a
+   class so the toggle component can flip themes deterministically.
+   ============================================================ */
+
+:root {
+  /* ---- Accent: Sienna (brand identity, actions only) ---- */
+  --accent: #b85d34; /* primary: buttons, active nav, logo */
+  --accent-hover: #a5512c; /* hover */
+  --accent-pressed: #8f4626; /* active/pressed + accent text on light */
+  --accent-tint: #f5e4d9; /* subtle fills, selected-row bg, avatars-bg */
+  --accent-on: #f7e5d8; /* cream text/icon sitting ON the accent */
+
+  /* ---- Neutral ramp: warm grey (one undertone top to bottom) ---- */
+  --n-0: #faf8f4; /* surfaces / cards on the page bg */
+  --n-1: #f3efe9; /* page background */
+  --n-2: #e8e1d6; /* borders, dividers */
+  --n-3: #ddd8d0; /* stronger borders, disabled fills */
+  --n-4: #b8b2a8; /* subtle text / placeholders */
+  --n-5: #857a6d; /* muted text / secondary labels */
+  --n-6: #4a4540; /* strong secondary text */
+  --n-7: #2c2620; /* near-black warm */
+
+  /* ---- Ink (body text) ---- */
+  --ink: #2c2620; /* primary body text */
+  --ink-muted: #5b5750; /* secondary text */
+  --ink-subtle: #857a6d; /* hints, timestamps */
+
+  /* ---- Semantic surface roles (map components to these) ---- */
+  --bg-page: var(--n-1);
+  --bg-surface: var(--n-0);
+  --bg-raised: #ffffff; /* white cards when extra lift is wanted */
+  --border: var(--n-2);
+  --border-strong: var(--n-3);
+  --text: var(--ink);
+  --text-muted: var(--ink-muted);
+  --text-subtle: var(--ink-subtle);
+  --link: var(--accent);
+
+  /* ---- Focused-metric highlight (Fix 1: left border, no fill) ---- */
+  --focus-border: var(--accent); /* use as: border-left: 3px solid */
+
+  /* ---- Status scale (5 steps) — fill / text pairs for badges ---- */
+  /* critical: COOL crimson, deliberately not warm, clears the sienna */
+  --status-critical: #cc2f4a; /* the dot/solid swatch */
+  --status-critical-bg: #f9d9de; /* badge fill */
+  --status-critical-text: #9c1f33; /* badge text */
+
+  /* high: warm amber (kept conventional; highlight is quieted instead) */
+  --status-high: #d4892a;
+  --status-high-bg: #fbe6cf;
+  --status-high-text: #8a4a12;
+
+  /* medium: ochre */
+  --status-medium: #cdb53e;
+  --status-medium-bg: #f6eecb;
+  --status-medium-text: #7a6510;
+
+  /* low: sage */
+  --status-low: #5c8a3c;
+  --status-low-bg: #e2ecd6;
+  --status-low-text: #3c5a2a;
+
+  /* info: slate */
+  --status-info: #6f8b95;
+  --status-info-bg: #e0e6e8;
+  --status-info-text: #3a525c;
+}
+
+/* ============================================================
+   Dark mode — warm near-black surfaces. Accent LIFTS to a
+   brighter sienna so it stays visible on the dark ground.
+   Triggered by `.dark` on the root element (manual toggle).
+   ============================================================ */
+.dark {
+  /* ---- Accent (lifted) ---- */
+  --accent: #cf7849; /* brighter sienna for dark surfaces */
+  --accent-hover: #db8556;
+  --accent-pressed: #b96838;
+  --accent-tint: #2e1f16; /* subtle warm fill on dark */
+  --accent-on: #1a1512; /* dark text sitting ON the lifted accent */
+
+  /* ---- Neutral ramp (warm, inverted) ---- */
+  --n-0: #221b16; /* surfaces / cards */
+  --n-1: #1a1512; /* page background (warm near-black) */
+  --n-2: #352a22; /* borders, dividers */
+  --n-3: #43362b; /* stronger borders */
+  --n-4: #6b5f52;
+  --n-5: #9c8d7e; /* muted text */
+  --n-6: #c4b7a8;
+  --n-7: #ece2d8; /* near-white warm */
+
+  /* ---- Ink ---- */
+  --ink: #ece2d8;
+  --ink-muted: #9c8d7e;
+  --ink-subtle: #6b5f52;
+
+  /* ---- Semantic roles ---- */
+  --bg-page: var(--n-1);
+  --bg-surface: var(--n-0);
+  --bg-raised: #2a211a;
+  --border: var(--n-2);
+  --border-strong: var(--n-3);
+  --text: var(--ink);
+  --text-muted: var(--ink-muted);
+  --text-subtle: var(--ink-subtle);
+  --link: var(--accent);
+  --focus-border: var(--accent);
+
+  /* ---- Status (dark fills + light text) ---- */
+  --status-critical: #e8616f;
+  --status-critical-bg: #4a1f25;
+  --status-critical-text: #f0a8af;
+
+  --status-high: #d4892a;
+  --status-high-bg: #4a3416;
+  --status-high-text: #e6b876;
+
+  --status-medium: #cdb53e;
+  --status-medium-bg: #403813;
+  --status-medium-text: #ddc56a;
+
+  --status-low: #6fa34a;
+  --status-low-bg: #2a3a1e;
+  --status-low-text: #a8c884;
+
+  --status-info: #6f8b95;
+  --status-info-bg: #243034;
+  --status-info-text: #8fb0bc;
+}
+
+/* ============================================================
+   Usage notes for the implementing session
+   ------------------------------------------------------------
+   PRIMARY BUTTON:   background: var(--accent); color: var(--accent-on);
+                     :hover -> var(--accent-hover); :active -> var(--accent-pressed)
+   ACTIVE NAV ITEM:  background: var(--accent); color: var(--accent-on);
+   LINK:             color: var(--link);
+   AVATAR/INITIALS:  background: var(--accent-tint); color: var(--accent);
+   FOCUSED METRIC:   border: 0.5px solid var(--border);
+                     border-left: 3px solid var(--focus-border);
+                     border-radius: 0;          (square — single-sided accent)
+   CARD:             background: var(--bg-surface); border: 0.5px solid var(--border);
+   BADGE (e.g.high): background: var(--status-high-bg); color: var(--status-high-text);
+   STATUS DOT:       background: var(--status-high);     (the solid swatch)
+
+   Do NOT use the accent for: status, large fills, decorative chrome.
+   The accent is a spotlight — sparing use is what makes it read as one.
+   ============================================================ */

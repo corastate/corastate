@@ -11,7 +11,13 @@ type PageHeaderProps = React.HTMLAttributes<HTMLDivElement>;
 
 function PageHeader({ className, children, ...props }: PageHeaderProps): JSX.Element {
   return (
-    <div className={cn('flex flex-col gap-1 pb-4 sm:flex-row sm:items-end sm:justify-between', className)} {...props}>
+    <div
+      className={cn(
+        'flex flex-col gap-1 pb-4 sm:flex-row sm:items-end sm:justify-between',
+        className,
+      )}
+      {...props}
+    >
       {children}
     </div>
   );

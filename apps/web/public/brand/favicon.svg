@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Corastate">
+  <title>Corastate</title>
+  <rect width="256" height="256" fill="#F3EFE9"/>
+  <rect x="28" y="28" width="200" height="200" rx="10" fill="#2C2620"/>
+  <rect x="58" y="58" width="140" height="140" rx="8" fill="#FAF8F4"/>
+  <rect x="88" y="88" width="80" height="80" rx="6" fill="#B85D34"/>
+</svg>

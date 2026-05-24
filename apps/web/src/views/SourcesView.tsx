@@ -46,13 +46,21 @@ export function SourcesView(): JSX.Element {
             disabled={isFetching}
             data-testid="sources-refresh"
           >
-            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} aria-hidden />
+            <RefreshCw
+              className={`mr-2 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
             Refresh
           </Button>
         </PageHeaderActions>
       </PageHeader>
 
-      <QueryBoundary isPending={isPending} isError={isError} error={error} onRetry={() => void refetch()}>
+      <QueryBoundary
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+      >
         {data ? <SourcesGrid sources={data.items} /> : null}
       </QueryBoundary>
     </div>
@@ -62,14 +70,20 @@ export function SourcesView(): JSX.Element {
 function SourcesGrid({ sources }: { sources: SourceListItem[] }): JSX.Element {
   if (sources.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground" data-testid="sources-empty">
-        No sources configured. The seed script (<code>pnpm seed</code>) creates a demo Okta + Defender
-        pair; in production, add sources via the CLI.
+      <div
+        className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground"
+        data-testid="sources-empty"
+      >
+        No sources configured. The seed script (<code>pnpm seed</code>) creates a demo Okta +
+        Defender pair; in production, add sources via the CLI.
       </div>
     );
   }
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3" data-testid="sources-grid">
+    <div
+      className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+      data-testid="sources-grid"
+    >
       {sources.map((source) => (
         <SourceCard key={source.id} source={source} />
       ))}

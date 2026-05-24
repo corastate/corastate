@@ -29,11 +29,7 @@ import type {
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  PageHeader,
-  PageHeaderDescription,
-  PageHeaderTitle,
-} from '@/components/PageHeader';
+import { PageHeader, PageHeaderDescription, PageHeaderTitle } from '@/components/PageHeader';
 import { QueryBoundary } from '@/components/QueryBoundary';
 import { overviewQuery } from '@/lib/api';
 import { formatAbsolute, formatRelative } from '@/lib/format';
@@ -47,13 +43,18 @@ export function OverviewView(): JSX.Element {
         <div>
           <PageHeaderTitle>Overview</PageHeaderTitle>
           <PageHeaderDescription>
-            One-page summary across every connected source. Gaps are the wedge: a device
-            an MDM should see but doesn't is the signal worth chasing.
+            One-page summary across every connected source. Gaps are the wedge: a device an MDM
+            should see but doesn't is the signal worth chasing.
           </PageHeaderDescription>
         </div>
       </PageHeader>
 
-      <QueryBoundary isPending={isPending} isError={isError} error={error} onRetry={() => void refetch()}>
+      <QueryBoundary
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+      >
         {data ? <Dashboard data={data} /> : null}
       </QueryBoundary>
     </div>
@@ -72,7 +73,10 @@ function Dashboard({ data }: { data: OverviewResponse }): JSX.Element {
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <GapSummaryCard items={data.sourceCoverage} />
-        <SyncFreshnessCard items={data.syncFreshness} thresholdHours={data.thresholds.sourceStaleHours} />
+        <SyncFreshnessCard
+          items={data.syncFreshness}
+          thresholdHours={data.thresholds.sourceStaleHours}
+        />
       </div>
     </div>
   );
@@ -111,6 +115,7 @@ function KpiGrid({ data }: { data: OverviewResponse }): JSX.Element {
         Icon={AlertTriangle}
         hint={`${kpis.staleCount} stale > ${kpis.staleThresholdDays}d`}
         IconHint={Clock}
+        focused
       />
     </div>
   );
@@ -123,23 +128,41 @@ interface KpiCardProps {
   Icon: typeof CheckCircle2;
   IconHint?: typeof CheckCircle2;
   tone?: 'good' | 'warn' | 'bad' | 'neutral';
+  /** Marks this card as the focused metric — sienna left-border, square corners. */
+  focused?: boolean;
 }
 
-function KpiCard({ label, value, hint, Icon, IconHint, tone = 'neutral' }: KpiCardProps): JSX.Element {
-  const toneClasses = {
-    good: 'text-emerald-600',
-    warn: 'text-amber-600',
-    bad: 'text-destructive',
-    neutral: 'text-foreground',
+function KpiCard({
+  label,
+  value,
+  hint,
+  Icon,
+  IconHint,
+  tone = 'neutral',
+  focused,
+}: KpiCardProps): JSX.Element {
+  // Icon tone draws from the PDS status scale solids; the headline value
+  // itself stays in body ink so cards read calm. Only the focused metric
+  // wears the sienna left-border highlight (square corners per PDS).
+  const iconTone = {
+    good: 'text-status-low',
+    warn: 'text-status-high',
+    bad: 'text-status-critical',
+    neutral: 'text-muted-foreground',
   }[tone];
   return (
-    <Card data-testid={`overview-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <Card
+      data-testid={`overview-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      className={
+        focused ? 'rounded-none border-l-[3px] !border-l-[color:var(--focus-border)]' : undefined
+      }
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <Icon className={`h-4 w-4 ${toneClasses}`} aria-hidden />
+        <Icon className={`h-4 w-4 ${iconTone}`} aria-hidden />
       </CardHeader>
       <CardContent className="pt-0">
-        <div className={`text-3xl font-semibold tabular-nums tracking-tight ${toneClasses}`}>
+        <div className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
           {value.toLocaleString()}
         </div>
         {hint ? (
@@ -173,7 +196,9 @@ function SourceCoverageCard({ items }: { items: SourceCoverageItem[] }): JSX.Ele
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate font-medium">{source.name}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{source.connectorId}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {source.connectorId}
+                    </span>
                     {!source.active ? <Badge tone="neutral">paused</Badge> : null}
                   </div>
                   <div className="flex shrink-0 items-baseline gap-3 text-xs tabular-nums">
@@ -204,8 +229,11 @@ function CoverageBar({
   max: number;
   tone: 'info' | 'warn';
 }): JSX.Element {
+  // Charts wear neutral by default; PDS reserves the accent for nav,
+  // links, buttons, focused metric, logo. Stale coverage gets the high
+  // status amber so the eye still catches it.
   const widthPct = Math.max(2, Math.round((value / max) * 100));
-  const fill = tone === 'warn' ? 'bg-amber-500/80' : 'bg-primary';
+  const fill = tone === 'warn' ? 'bg-status-high' : 'bg-foreground/60';
   return (
     <div
       role="progressbar"
@@ -220,7 +248,9 @@ function CoverageBar({
 }
 
 function GapSummaryCard({ items }: { items: SourceCoverageItem[] }): JSX.Element {
-  const ranked = [...items].filter((s) => s.missingCount > 0).sort((a, b) => b.missingCount - a.missingCount);
+  const ranked = [...items]
+    .filter((s) => s.missingCount > 0)
+    .sort((a, b) => b.missingCount - a.missingCount);
   return (
     <Card data-testid="overview-gap-summary">
       <CardHeader>
@@ -232,7 +262,7 @@ function GapSummaryCard({ items }: { items: SourceCoverageItem[] }): JSX.Element
       <CardContent>
         {ranked.length === 0 ? (
           <EmptyHint>
-            <CheckCircle2 className="mr-1 inline h-4 w-4 text-emerald-600" aria-hidden />
+            <CheckCircle2 className="mr-1 inline h-4 w-4 text-status-low" aria-hidden />
             No gaps detected.
           </EmptyHint>
         ) : (
@@ -240,14 +270,16 @@ function GapSummaryCard({ items }: { items: SourceCoverageItem[] }): JSX.Element
             {ranked.map((source) => (
               <li
                 key={source.id}
-                className="flex items-center justify-between gap-3 rounded-md border bg-card/50 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/50 px-3 py-2"
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate font-medium">{source.name}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{source.connectorId}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {source.connectorId}
+                  </span>
                 </div>
                 <a
-                  className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                   href={`#/devices?missingFrom=${encodeURIComponent(source.connectorId)}&hasGaps=true`}
                 >
                   <Badge tone="warn">{source.missingCount} missing</Badge>
@@ -261,7 +293,11 @@ function GapSummaryCard({ items }: { items: SourceCoverageItem[] }): JSX.Element
   );
 }
 
-function HealthDistributionCard({ distribution }: { distribution: HealthDistribution }): JSX.Element {
+function HealthDistributionCard({
+  distribution,
+}: {
+  distribution: HealthDistribution;
+}): JSX.Element {
   const total = distribution.healthy + distribution.atRisk + distribution.unknown;
   return (
     <Card data-testid="overview-health-distribution">
@@ -272,16 +308,31 @@ function HealthDistributionCard({ distribution }: { distribution: HealthDistribu
       <CardContent className="flex flex-col items-center gap-4">
         <Donut
           segments={[
-            { value: distribution.healthy, color: 'rgb(16 185 129)', label: 'healthy' },
-            { value: distribution.atRisk, color: 'rgb(245 158 11)', label: 'at risk' },
-            { value: distribution.unknown, color: 'rgb(148 163 184)', label: 'unknown' },
+            { value: distribution.healthy, color: 'var(--status-low)', label: 'healthy' },
+            { value: distribution.atRisk, color: 'var(--status-high)', label: 'at risk' },
+            { value: distribution.unknown, color: 'var(--status-info)', label: 'unknown' },
           ]}
           total={total}
         />
         <ul className="w-full space-y-1 text-xs">
-          <LegendRow color="rgb(16 185 129)" label="Healthy" value={distribution.healthy} total={total} />
-          <LegendRow color="rgb(245 158 11)" label="At risk" value={distribution.atRisk} total={total} />
-          <LegendRow color="rgb(148 163 184)" label="Unknown" value={distribution.unknown} total={total} />
+          <LegendRow
+            color="var(--status-low)"
+            label="Healthy"
+            value={distribution.healthy}
+            total={total}
+          />
+          <LegendRow
+            color="var(--status-high)"
+            label="At risk"
+            value={distribution.atRisk}
+            total={total}
+          />
+          <LegendRow
+            color="var(--status-info)"
+            label="Unknown"
+            value={distribution.unknown}
+            total={total}
+          />
         </ul>
       </CardContent>
     </Card>
@@ -313,7 +364,7 @@ function Donut({ segments, total }: { segments: DonutSegment[]; total: number })
         r={radius}
         fill="none"
         strokeWidth={stroke}
-        className="stroke-muted"
+        className="stroke-[color:var(--n-2)]"
       />
       {total > 0
         ? segments.map((seg) => {
@@ -365,7 +416,11 @@ function LegendRow({
   return (
     <li className="flex items-center justify-between gap-2">
       <span className="flex items-center gap-2">
-        <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} aria-hidden />
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: color }}
+          aria-hidden
+        />
         <span className="text-muted-foreground">{label}</span>
       </span>
       <span className="font-medium tabular-nums">
@@ -398,12 +453,14 @@ function SyncFreshnessCard({
             {items.map((item) => (
               <li
                 key={item.sourceId}
-                className="flex items-center justify-between gap-3 rounded-md border bg-card/50 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/50 px-3 py-2"
                 data-testid="overview-sync-row"
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate font-medium">{item.sourceName}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{item.connectorId}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {item.connectorId}
+                  </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs">
                   <span
@@ -431,4 +488,3 @@ function pct(value: number, total: number): string {
   if (total === 0) return '0%';
   return `${Math.round((value / total) * 100)}%`;
 }
-

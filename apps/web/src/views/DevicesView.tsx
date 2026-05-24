@@ -47,7 +47,14 @@ import {
   PageHeaderTitle,
 } from '@/components/PageHeader';
 import { QueryBoundary } from '@/components/QueryBoundary';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { devicesQuery, getDevices, sourcesQuery, type DeviceListParams } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
@@ -117,20 +124,23 @@ function readFiltersFromHash(): FilterState {
   const csv = (key: string): string[] => {
     const v = params.get(key);
     if (!v) return [];
-    return v.split(',').map((s) => s.trim()).filter(Boolean);
+    return v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   };
   return {
     q: params.get('q') ?? '',
     sources: csv('sources'),
     missingFrom: csv('missingFrom'),
     compliance: csv('compliance').filter(
-      (c): c is DeviceComplianceFilter =>
-        c === 'healthy' || c === 'at_risk' || c === 'unknown',
+      (c): c is DeviceComplianceFilter => c === 'healthy' || c === 'at_risk' || c === 'unknown',
     ),
     platform: csv('platform'),
     hasGaps: params.get('hasGaps') === 'true',
     staleOnly: params.get('staleOnly') === 'true',
-    sort: (SORT_FIELDS.find((f) => f.value === params.get('sort'))?.value ?? 'updatedAt') as DeviceSortField,
+    sort: (SORT_FIELDS.find((f) => f.value === params.get('sort'))?.value ??
+      'updatedAt') as DeviceSortField,
     dir: params.get('dir') === 'asc' ? 'asc' : 'desc',
   };
 }
@@ -212,28 +222,28 @@ export function DevicesView(): JSX.Element {
     return items.map((s) => ({ value: s.type, label: `${s.name} · ${s.type}` }));
   }, [sourcesData]);
 
-  const updateFilter = useCallback(<K extends keyof FilterState>(key: K, value: FilterState[K]): void => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setCursorStack([undefined]);
-  }, []);
+  const updateFilter = useCallback(
+    <K extends keyof FilterState>(key: K, value: FilterState[K]): void => {
+      setFilters((prev) => ({ ...prev, [key]: value }));
+      setCursorStack([undefined]);
+    },
+    [],
+  );
 
   const clearFilters = useCallback((): void => {
     setFilters({ ...DEFAULT_FILTERS });
     setCursorStack([undefined]);
   }, []);
 
-  const onSort = useCallback(
-    (field: DeviceSortField): void => {
-      setFilters((prev) => {
-        if (prev.sort === field) {
-          return { ...prev, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
-        }
-        return { ...prev, sort: field, dir: 'asc' };
-      });
-      setCursorStack([undefined]);
-    },
-    [],
-  );
+  const onSort = useCallback((field: DeviceSortField): void => {
+    setFilters((prev) => {
+      if (prev.sort === field) {
+        return { ...prev, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      }
+      return { ...prev, sort: field, dir: 'asc' };
+    });
+    setCursorStack([undefined]);
+  }, []);
 
   const handleNext = (): void => {
     if (data?.nextCursor) setCursorStack((s) => [...s, data.nextCursor!]);
@@ -260,7 +270,8 @@ export function DevicesView(): JSX.Element {
     setTimeout(() => URL.revokeObjectURL(url), 1_000);
   }, [filters, debouncedQuery]);
 
-  const totalLabel = data?.total !== undefined ? `${data.total} match${data.total === 1 ? '' : 'es'}` : null;
+  const totalLabel =
+    data?.total !== undefined ? `${data.total} match${data.total === 1 ? '' : 'es'}` : null;
 
   return (
     <div className="space-y-4">
@@ -268,8 +279,8 @@ export function DevicesView(): JSX.Element {
         <div>
           <PageHeaderTitle>Devices</PageHeaderTitle>
           <PageHeaderDescription>
-            One row per correlated device. Filter by source coverage, compliance bucket,
-            platform, or gap; export the filtered set as CSV.
+            One row per correlated device. Filter by source coverage, compliance bucket, platform,
+            or gap; export the filtered set as CSV.
           </PageHeaderDescription>
         </div>
         <PageHeaderActions>
@@ -293,7 +304,12 @@ export function DevicesView(): JSX.Element {
         totalLabel={totalLabel}
       />
 
-      <QueryBoundary isPending={isPending} isError={isError} error={error} onRetry={() => void refetch()}>
+      <QueryBoundary
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+      >
         {data ? (
           <DevicesTable
             devices={data.items}
@@ -320,11 +336,17 @@ interface FilterBarProps {
   totalLabel: string | null;
 }
 
-function FilterBar({ filters, sourceOptions, onUpdate, onClear, totalLabel }: FilterBarProps): JSX.Element {
+function FilterBar({
+  filters,
+  sourceOptions,
+  onUpdate,
+  onClear,
+  totalLabel,
+}: FilterBarProps): JSX.Element {
   const activeCount = filterCount(filters);
   return (
     <section
-      className="space-y-3 rounded-md border bg-card p-3"
+      className="space-y-3 rounded-md border border-border bg-card p-3"
       aria-label="Device filters"
       data-testid="devices-filterbar"
     >
@@ -367,7 +389,8 @@ function FilterBar({ filters, sourceOptions, onUpdate, onClear, totalLabel }: Fi
             onUpdate(
               'compliance',
               values.filter(
-                (v): v is DeviceComplianceFilter => v === 'healthy' || v === 'at_risk' || v === 'unknown',
+                (v): v is DeviceComplianceFilter =>
+                  v === 'healthy' || v === 'at_risk' || v === 'unknown',
               ),
             )
           }
@@ -444,7 +467,10 @@ function FacetMenu({ label, testId, options, selected, onChange }: FacetMenuProp
         variant="outline"
         size="sm"
         onClick={() => setOpen((v) => !v)}
-        className={cn('h-9 gap-1', selected.length > 0 && 'border-primary text-primary')}
+        className={cn(
+          'h-9 gap-1',
+          selected.length > 0 && 'border-primary/40 bg-[color:var(--accent-tint)] text-primary',
+        )}
         data-testid={testId}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -460,7 +486,7 @@ function FacetMenu({ label, testId, options, selected, onChange }: FacetMenuProp
       {open ? (
         <div
           role="menu"
-          className="absolute left-0 top-full z-30 mt-1 min-w-[14rem] rounded-md border bg-popover p-1 shadow-md"
+          className="absolute left-0 top-full z-30 mt-1 min-w-[14rem] rounded-md border border-border bg-popover p-1 shadow-md"
         >
           {options.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">No options</p>
@@ -471,12 +497,12 @@ function FacetMenu({ label, testId, options, selected, onChange }: FacetMenuProp
                 return (
                   <li key={opt.value}>
                     <label
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                       data-testid={`${testId}-option-${opt.value}`}
                     >
                       <input
                         type="checkbox"
-                        className="h-3.5 w-3.5 accent-primary"
+                        className="h-3.5 w-3.5 accent-[color:var(--accent)]"
                         checked={checked}
                         onChange={() => toggle(opt.value)}
                       />
@@ -488,11 +514,11 @@ function FacetMenu({ label, testId, options, selected, onChange }: FacetMenuProp
             </ul>
           )}
           {selected.length > 0 ? (
-            <div className="border-t pt-1">
+            <div className="border-t border-border pt-1">
               <button
                 type="button"
                 onClick={() => onChange([])}
-                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted"
               >
                 <X className="h-3 w-3" aria-hidden /> Clear {label.toLowerCase()}
               </button>
@@ -521,8 +547,8 @@ function ToggleChip({ label, testId, active, onClick }: ToggleChipProps): JSX.El
       className={cn(
         'inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors',
         active
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-input bg-background text-muted-foreground hover:bg-accent hover:text-foreground',
+          ? 'border-primary/40 bg-[color:var(--accent-tint)] text-primary'
+          : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       {label}
@@ -556,7 +582,7 @@ function DevicesTable({
   if (devices.length === 0) {
     return (
       <div
-        className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground"
+        className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground"
         data-testid="devices-empty"
       >
         No devices match. Adjust filters or run a sync (<code>pnpm seed</code>) and refresh.
@@ -565,7 +591,7 @@ function DevicesTable({
   }
   return (
     <>
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border border-border bg-card">
         <Table data-testid="devices-table">
           <TableHeader>
             <TableRow>
@@ -616,7 +642,13 @@ interface SortableHeaderProps {
   onSort: (field: DeviceSortField) => void;
 }
 
-function SortableHeader({ field, label, activeField, dir, onSort }: SortableHeaderProps): JSX.Element {
+function SortableHeader({
+  field,
+  label,
+  activeField,
+  dir,
+  onSort,
+}: SortableHeaderProps): JSX.Element {
   const active = activeField === field;
   return (
     <TableHead>
@@ -684,7 +716,7 @@ function MissingFrom({ missing }: { missing: string[] }): JSX.Element {
   if (missing.length === 0) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> complete
+        <CheckCircle2 className="h-3.5 w-3.5 text-status-low" aria-hidden /> complete
       </span>
     );
   }
@@ -717,7 +749,11 @@ interface FlagIconProps {
 
 function FlagIcon({ Icon, label, state }: FlagIconProps): JSX.Element {
   const tone =
-    state === true ? 'text-emerald-600' : state === false ? 'text-destructive' : 'text-muted-foreground/60';
+    state === true
+      ? 'text-status-low'
+      : state === false
+        ? 'text-status-critical'
+        : 'text-muted-foreground/60';
   const status = state === null ? 'unknown' : state ? 'yes' : 'no';
   return (
     <span
@@ -725,7 +761,11 @@ function FlagIcon({ Icon, label, state }: FlagIconProps): JSX.Element {
       title={`${label}: ${status}`}
       aria-label={`${label}: ${status}`}
     >
-      {state === false ? <XCircle className="h-4 w-4" aria-hidden /> : <Icon className="h-4 w-4" aria-hidden />}
+      {state === false ? (
+        <XCircle className="h-4 w-4" aria-hidden />
+      ) : (
+        <Icon className="h-4 w-4" aria-hidden />
+      )}
     </span>
   );
 }
@@ -793,7 +833,11 @@ const CSV_HEADERS = [
 function devicesToCsv(devices: Device[]): string {
   const escape = (value: unknown): string => {
     if (value === null || value === undefined) return '';
-    const s = Array.isArray(value) ? value.join('|') : value instanceof Date ? value.toISOString() : String(value);
+    const s = Array.isArray(value)
+      ? value.join('|')
+      : value instanceof Date
+        ? value.toISOString()
+        : String(value);
     if (s.includes(',') || s.includes('"') || s.includes('\n')) {
       return `"${s.replace(/"/g, '""')}"`;
     }

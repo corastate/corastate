@@ -34,15 +34,15 @@ export function QueryBoundary({
   if (isError) {
     const message = error instanceof Error ? error.message : String(error);
     return (
-      <Card className="border-destructive/40" role="alert">
+      <Card className="border-status-critical/40" role="alert">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden /> Could not load
+            <AlertTriangle className="h-4 w-4 text-status-critical" aria-hidden /> Could not load
           </CardTitle>
           <CardDescription>The backend returned an error.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <pre className="overflow-x-auto rounded-md bg-destructive/10 p-3 font-mono text-xs">
+          <pre className="overflow-x-auto rounded-md bg-status-critical-bg p-3 font-mono text-xs text-status-critical-text">
             {message}
           </pre>
           {onRetry ? (

@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="min-h-screen bg-background">
         <main className="container py-12">
-          <Card className="border-destructive/50">
+          <Card className="border-status-critical/50">
             <CardHeader>
               <CardTitle>Something went wrong</CardTitle>
               <CardDescription>
@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              <pre className="overflow-x-auto rounded-md bg-destructive/10 p-3 font-mono text-xs">
+              <pre className="overflow-x-auto rounded-md bg-status-critical-bg p-3 font-mono text-xs text-status-critical-text">
                 {this.state.error.message}
               </pre>
               <Button onClick={() => window.location.reload()}>Reload</Button>

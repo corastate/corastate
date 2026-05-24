@@ -38,13 +38,21 @@ export function HealthView(): JSX.Element {
             disabled={isFetching}
             data-testid="health-refresh"
           >
-            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} aria-hidden />
+            <RefreshCw
+              className={`mr-2 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
             Refresh
           </Button>
         </PageHeaderActions>
       </PageHeader>
 
-      <QueryBoundary isPending={isPending} isError={isError} error={error} onRetry={() => void refetch()}>
+      <QueryBoundary
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+      >
         {data ? (
           <Card data-testid="health-card">
             <CardHeader>

@@ -1,11 +1,17 @@
 /**
- * Top-level shell. Renders the header with nav, then routes to one of the
- * four views via the hash router in lib/router.ts. Header is sticky so the
- * navigation chrome stays visible while a long table scrolls.
+ * Top-level shell. Renders the header with the wordmark, primary nav, and
+ * theme toggle, then routes to one of the five views via the hash router
+ * in lib/router.ts. Header is sticky so the navigation chrome stays
+ * visible while a long table scrolls.
+ *
+ * PDS rule: the active nav item is one of the few places that wears the
+ * sienna accent. Inactive items stay warm-grey neutral.
  */
 
 import { Activity, Boxes, LayoutDashboard, Plug, Users } from 'lucide-react';
 
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Wordmark } from '@/components/Wordmark';
 import { cn } from '@/lib/utils';
 import { navigate, useRoute, type Route } from '@/lib/router';
 
@@ -31,17 +37,27 @@ export function AppShell({ children }: AppShellProps): JSX.Element {
   const active = useRoute();
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="container flex items-center gap-6 py-3">
-          <div className="flex flex-col">
-            <h1 className="text-base font-semibold leading-tight tracking-tight">Corastate</h1>
-            <p className="text-xs text-muted-foreground">Device health, joined across tools.</p>
-          </div>
+          <a
+            href="#/overview"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('overview');
+            }}
+            className="inline-flex items-center"
+            aria-label="Corastate home"
+          >
+            <Wordmark className="block h-5" />
+          </a>
           <nav className="flex items-center gap-1" aria-label="Primary">
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.route} item={item} active={active === item.route} />
             ))}
           </nav>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="container py-6">{children}</main>
@@ -67,7 +83,7 @@ function NavLink({ item, active }: NavLinkProps): JSX.Element {
       className={cn(
         'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
         active
-          ? 'bg-secondary text-secondary-foreground'
+          ? 'bg-primary text-primary-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
