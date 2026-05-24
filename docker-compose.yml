@@ -1,3 +1,17 @@
+# Single-command local stack for Corastate.
+#
+#   docker compose up --build
+#
+# Brings up Postgres, applies migrations, loads demo data, then starts the
+# backend, worker, and web. Open http://localhost:5173 once the web service
+# logs "ready", the UI is populated with the seeded devices and identities
+# on first boot.
+#
+# Variable substitution: compose reads .env at the project root if present,
+# but every variable used here has a default, so the stack runs end to end
+# with no .env file at all. The defaults are demo-grade; rotate them for
+# any non-throwaway install.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,30 +27,113 @@ services:
       - corastate_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-corastate} -d ${POSTGRES_DB:-corastate}']
-      interval: 5s
+      interval: 3s
       timeout: 5s
-      retries: 10
+      retries: 20
 
+  # Optional Postgres web UI. Skipped by default; opt in with:
+  #   docker compose --profile tools up
   adminer:
     image: adminer:4
     container_name: corastate-adminer
     restart: unless-stopped
+    profiles: ['tools']
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - '8081:8080'
+      - '${ADMINER_PORT:-8081}:8080'
     environment:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: pepa-linha
 
-  # Worker, backend, and web service definitions land in Week 4 alongside the
-  # 30-minute clone-to-data path (phase-1-sprint-plan-v3.md §"Week 4"). The
-  # Phase 1 dev loop today is `pnpm dev`, which spawns the three apps locally
-  # against the dockerized Postgres above. Architecture-v3 §"Credential and
-  # security architecture" locks the rule that the worker is the only process
-  # holding the master key; that boundary is already in place (only the
-  # worker reads CORASTATE_MASTER_KEY) regardless of where each process runs.
+  # One-shot: apply Drizzle migrations, roll the observations partition
+  # window forward, (re-)create the current_state materialized view.
+  migrate:
+    build:
+      context: .
+      target: cli
+    image: corastate/cli:dev
+    container_name: corastate-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-corastate}:${POSTGRES_PASSWORD:-corastate}@postgres:5432/${POSTGRES_DB:-corastate}
+      LOG_PRETTY: '1'
+    command: ['migrate']
+    restart: 'no'
+
+  # One-shot: load demo data so the UI has something to render on first boot.
+  # Idempotent at the source level (upserts by display name).
+  seed:
+    image: corastate/cli:dev
+    container_name: corastate-seed
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-corastate}:${POSTGRES_PASSWORD:-corastate}@postgres:5432/${POSTGRES_DB:-corastate}
+      LOG_PRETTY: '1'
+    command: ['seed']
+    restart: 'no'
+
+  backend:
+    build:
+      context: .
+      target: backend
+    image: corastate/backend:dev
+    container_name: corastate-backend
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-corastate}:${POSTGRES_PASSWORD:-corastate}@postgres:5432/${POSTGRES_DB:-corastate}
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: '4000'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: '1'
+    ports:
+      - '${BACKEND_PORT:-4000}:4000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:4000/internal/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Worker is the only process that holds the master key (architecture-v3
+  # §"Credential and security architecture"). The seeded demo sources are
+  # marked inactive, so the worker validates the key, finds no work, and
+  # sleeps. Wire up real sources via the CLI to start polling.
+  worker:
+    build:
+      context: .
+      target: worker
+    image: corastate/worker:dev
+    container_name: corastate-worker
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-corastate}:${POSTGRES_PASSWORD:-corastate}@postgres:5432/${POSTGRES_DB:-corastate}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: '1'
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-60000}
+      # 32 zero bytes, base64-encoded. Demo-only; rotate for any install
+      # that will hold real vendor credentials.
+      CORASTATE_MASTER_KEY: ${CORASTATE_MASTER_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+
+  web:
+    build:
+      context: .
+      target: web
+    image: corastate/web:dev
+    container_name: corastate-web
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${WEB_PORT:-5173}:80'
 
 volumes:
   corastate_pgdata:

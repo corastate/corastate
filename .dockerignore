@@ -1,0 +1,38 @@
+# Keep the build context small and reproducible. Everything actually used
+# by the image is COPY'd explicitly in Dockerfile.
+
+.git
+.github
+.gitignore
+.editorconfig
+.prettierrc
+.claude
+.vscode
+.idea
+node_modules
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/.tsbuildinfo
+**/coverage
+**/.cache
+**/.vite
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
+docs
+LICENSE
+README.md
+CONTRIBUTING.md
+
+# Env files never go in images. .env.example documents the shape and is
+# copied into the build context only for local reference; ignore it too.
+.env
+.env.*
+
+# Docker artifacts themselves. docker/ is kept in the build context because
+# docker/nginx.conf is copied into the web image.
+Dockerfile
+.dockerignore
+docker-compose.yml
