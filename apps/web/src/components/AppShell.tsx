@@ -38,29 +38,29 @@ export function AppShell({ children }: AppShellProps): JSX.Element {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="container flex items-center gap-6 py-3">
+        <div className="container flex items-center gap-3 py-3 sm:gap-6">
           <a
             href="#/overview"
             onClick={(e) => {
               e.preventDefault();
               navigate('overview');
             }}
-            className="inline-flex items-center"
+            className="inline-flex shrink-0 items-center"
             aria-label="Corastate home"
           >
             <Wordmark className="block h-5" />
           </a>
-          <nav className="flex items-center gap-1" aria-label="Primary">
+          <nav className="flex min-w-0 items-center gap-1" aria-label="Primary">
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.route} item={item} active={active === item.route} />
             ))}
           </nav>
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             <ThemeToggle />
           </div>
         </div>
       </header>
-      <main className="container py-6">{children}</main>
+      <main className="container py-4 sm:py-6">{children}</main>
     </div>
   );
 }
@@ -79,16 +79,18 @@ function NavLink({ item, active }: NavLinkProps): JSX.Element {
         navigate(item.route);
       }}
       aria-current={active ? 'page' : undefined}
+      aria-label={item.label}
+      title={item.label}
       data-testid={`nav-${item.route}`}
       className={cn(
-        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        'inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors md:px-3',
         active
           ? 'bg-primary text-primary-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
-      <item.Icon className="h-4 w-4" aria-hidden />
-      {item.label}
+      <item.Icon className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="hidden md:inline">{item.label}</span>
     </a>
   );
 }

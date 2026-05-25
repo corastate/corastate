@@ -351,7 +351,7 @@ function FilterBar({
       data-testid="devices-filterbar"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search
             className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
@@ -361,7 +361,7 @@ function FilterBar({
             placeholder="Search hostname or owner email"
             value={filters.q}
             onChange={(e) => onUpdate('q', e.target.value)}
-            className="w-72 pl-8"
+            className="w-full pl-8 sm:w-72"
             aria-label="Search devices"
             data-testid="devices-search"
           />

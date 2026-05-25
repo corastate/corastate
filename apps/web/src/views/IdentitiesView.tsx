@@ -73,8 +73,8 @@ export function IdentitiesView(): JSX.Element {
             identity's email.
           </PageHeaderDescription>
         </div>
-        <PageHeaderActions>
-          <div className="relative">
+        <PageHeaderActions className="w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search
               className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden
@@ -84,7 +84,7 @@ export function IdentitiesView(): JSX.Element {
               placeholder="Search name or email"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
-              className="w-72 pl-8"
+              className="w-full pl-8 sm:w-72"
               aria-label="Search identities"
               data-testid="identities-search"
             />

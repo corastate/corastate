@@ -34,7 +34,14 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: '2rem',
+      // Padding scales with viewport so the page stops eating 64px of width
+      // at 375. The container itself stays width:100% below 2xl, so the
+      // viewport drives content width directly.
+      padding: {
+        DEFAULT: '1rem',
+        sm: '1.5rem',
+        lg: '2rem',
+      },
       screens: {
         '2xl': '1400px',
       },

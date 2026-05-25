@@ -193,15 +193,15 @@ function SourceCoverageCard({ items }: { items: SourceCoverageItem[] }): JSX.Ele
           <ul className="space-y-3">
             {items.map((source) => (
               <li key={source.id} className="space-y-1.5" data-testid="overview-source-row">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <div className="flex min-w-0 items-center gap-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 text-sm">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="truncate font-medium">{source.name}</span>
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <span className="hidden truncate font-mono text-xs text-muted-foreground sm:inline">
                       {source.connectorId}
                     </span>
                     {!source.active ? <Badge tone="neutral">paused</Badge> : null}
                   </div>
-                  <div className="flex shrink-0 items-baseline gap-3 text-xs tabular-nums">
+                  <div className="flex shrink-0 items-baseline gap-1.5 text-xs tabular-nums">
                     <span className="font-semibold text-foreground">{source.deviceCount}</span>
                     <span className="text-muted-foreground">devices</span>
                   </div>
@@ -270,16 +270,16 @@ function GapSummaryCard({ items }: { items: SourceCoverageItem[] }): JSX.Element
             {ranked.map((source) => (
               <li
                 key={source.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/50 px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/50 px-3 py-2"
               >
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <span className="truncate font-medium">{source.name}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
+                  <span className="hidden truncate font-mono text-xs text-muted-foreground sm:inline">
                     {source.connectorId}
                   </span>
                 </div>
                 <a
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-medium text-primary hover:underline"
                   href={`#/devices?missingFrom=${encodeURIComponent(source.connectorId)}&hasGaps=true`}
                 >
                   <Badge tone="warn">{source.missingCount} missing</Badge>
@@ -453,18 +453,18 @@ function SyncFreshnessCard({
             {items.map((item) => (
               <li
                 key={item.sourceId}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/50 px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/50 px-3 py-2"
                 data-testid="overview-sync-row"
               >
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <span className="truncate font-medium">{item.sourceName}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
+                  <span className="hidden truncate font-mono text-xs text-muted-foreground sm:inline">
                     {item.connectorId}
                   </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs">
                   <span
-                    className="text-muted-foreground"
+                    className="whitespace-nowrap text-muted-foreground"
                     title={item.lastSyncedAt ? formatAbsolute(item.lastSyncedAt) : undefined}
                   >
                     {formatRelative(item.lastSyncedAt)}
