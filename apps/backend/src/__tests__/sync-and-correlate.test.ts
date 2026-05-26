@@ -225,10 +225,10 @@ describe('Phase 1 Week 3: sync + correlation end-to-end', () => {
           lastLogin: '2026-05-19T08:00:00.000Z',
           lastUpdated: '2026-05-19T08:00:01.000Z',
           profile: {
-            login: 'wesley@example.com',
-            email: 'wesley@example.com',
-            firstName: 'Wesley',
-            lastName: 'Lakis',
+            login: 'sam@example.com',
+            email: 'sam@example.com',
+            firstName: 'Sam',
+            lastName: 'Carter',
           },
         },
       ],
@@ -278,7 +278,7 @@ describe('Phase 1 Week 3: sync + correlation end-to-end', () => {
           managementState: 'managed',
           complianceState: 'compliant',
           lastSyncDateTime: sharedDeviceCheckIn,
-          emailAddress: 'wesley@example.com',
+          emailAddress: 'sam@example.com',
           wiFiMacAddress: 'AA:BB:CC:DD:EE:FF',
         },
         // Defender-only device — Okta never saw it.
@@ -293,7 +293,7 @@ describe('Phase 1 Week 3: sync + correlation end-to-end', () => {
           managementState: 'managed',
           complianceState: 'compliant',
           lastSyncDateTime: defenderOnlyCheckIn,
-          userPrincipalName: 'wesley@example.com',
+          userPrincipalName: 'sam@example.com',
           wiFiMacAddress: '11:22:33:44:55:66',
         },
       ],
@@ -346,7 +346,7 @@ describe('Phase 1 Week 3: sync + correlation end-to-end', () => {
     expect(shared.azureAdDeviceId).toBe('12345678-1234-1234-1234-aaaaaaaaaaaa');
     expect(shared.diskEncryption).toBe(true);
     expect(shared.mdmEnrolled).toBe(true);
-    expect(shared.ownerEmail).toBe('wesley@example.com');
+    expect(shared.ownerEmail).toBe('sam@example.com');
     // Per-source last-seen survives the merge.
     expect(shared.sourceLastSeen.okta).toBe(sharedDeviceCheckIn);
     expect(shared.sourceLastSeen.defender).toBe(sharedDeviceCheckIn);
@@ -420,7 +420,7 @@ describe('Phase 1 Week 3: sync + correlation end-to-end', () => {
       // Fuzzy filter on owner_email also works.
       const byEmail = await app.inject({
         method: 'GET',
-        url: '/v1/devices?q=wesley',
+        url: '/v1/devices?q=sam',
       });
       expect(byEmail.statusCode).toBe(200);
     } finally {

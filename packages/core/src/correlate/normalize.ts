@@ -1,7 +1,6 @@
 /**
  * Normalization helpers shared across the correlation engine. Ported from
- * Device Spotlight's correlator.py (`/Users/wesley/Documents/GitHub/Proserv/
- * Embed/Device Spotlight/correlator.py`) — the algorithms that turn vendor
+ * an earlier Device Spotlight correlator: the algorithms that turn vendor
  * strings into stable comparison keys.
  *
  * The functions are pure so the engine can be exercised by unit tests

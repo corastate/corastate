@@ -5,7 +5,7 @@ stack runs the four services from the repo Dockerfile on ECS Fargate, fronted
 by an ALB, against an RDS Postgres instance. Everything lives inside a single
 VPC; nothing in the application path is publicly addressable except the ALB.
 
-This config is checked in but not yet applied. Wesley applies it when he is
+This config is checked in but not yet applied. The maintainer applies it when
 ready to commit to the monthly AWS spend. Until then the directory is a
 review artifact.
 
@@ -80,8 +80,8 @@ call out where to flip the switches.
 
 ## One-time setup
 
-Wesley runs these once with admin credentials. Future deploys go through
-GitHub Actions and the OIDC role.
+The maintainer runs these once with admin credentials. Future deploys go
+through GitHub Actions and the OIDC role.
 
 1. **AWS account.** Create or pick the account that owns the stack. Note the
    account ID.

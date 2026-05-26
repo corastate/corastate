@@ -65,7 +65,7 @@ resource "aws_secretsmanager_secret_version" "session_secret" {
   secret_string = random_password.session_secret.result
 }
 
-# Placeholder for the Anthropic API key. Wesley populates the value
+# Placeholder for the Anthropic API key. The maintainer populates the value
 # manually via the AWS console or CLI after the secret is created.
 # Terraform manages the container; the value lifecycle is ignored.
 resource "aws_secretsmanager_secret" "anthropic_api_key" {

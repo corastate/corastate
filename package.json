@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Open-core device health aggregation engine.",
-  "author": "Wesley Lakis",
+  "author": "llort-red",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20.11",

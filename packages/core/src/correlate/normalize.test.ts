@@ -41,12 +41,12 @@ describe('normalizeHostname', () => {
   });
 
   it('collapses underscore + whitespace + repeated hyphens to single hyphens', () => {
-    expect(normalizeHostname('  wesley_s laptop  ')).toBe('WESLEY-S-LAPTOP');
+    expect(normalizeHostname('  sam_s laptop  ')).toBe('SAM-S-LAPTOP');
   });
 
   it('strips smart quotes and ASCII apostrophes', () => {
-    expect(normalizeHostname("wesley's mac")).toBe('WESLEYS-MAC');
-    expect(normalizeHostname('wesley’s mac')).toBe('WESLEYS-MAC');
+    expect(normalizeHostname("sam's mac")).toBe('SAMS-MAC');
+    expect(normalizeHostname('sam’s mac')).toBe('SAMS-MAC');
   });
 
   it('returns empty string for null/undefined', () => {

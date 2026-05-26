@@ -18,9 +18,9 @@ const baseDevice: DefenderDevice = {
   managementState: 'managed',
   complianceState: 'compliant',
   lastSyncDateTime: '2026-05-19T10:30:00.000Z',
-  emailAddress: 'Wesley.Lakis@example.com',
-  userPrincipalName: 'wesley@example.com',
-  userDisplayName: 'Wesley Lakis',
+  emailAddress: 'Sam.Carter@example.com',
+  userPrincipalName: 'sam@example.com',
+  userDisplayName: 'Sam Carter',
   wiFiMacAddress: 'a1-b2-c3-d4-e5-f6',
   ethernetMacAddress: 'a1b2c3d4e5f7',
 };
@@ -58,12 +58,12 @@ describe('mapDefenderDevice', () => {
   });
 
   it('lowercases the owner email, preferring emailAddress over UPN', () => {
-    expect(mapDefenderDevice(baseDevice).ownerEmail).toBe('wesley.lakis@example.com');
+    expect(mapDefenderDevice(baseDevice).ownerEmail).toBe('sam.carter@example.com');
   });
 
   it('falls back to userPrincipalName when emailAddress is missing', () => {
     const upnOnly: DefenderDevice = { ...baseDevice, emailAddress: null };
-    expect(mapDefenderDevice(upnOnly).ownerEmail).toBe('wesley@example.com');
+    expect(mapDefenderDevice(upnOnly).ownerEmail).toBe('sam@example.com');
   });
 
   it('returns null ownerEmail when no email field is present', () => {
