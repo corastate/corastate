@@ -1,0 +1,306 @@
+name: AWS deploy
+
+# Build images, lint Terraform, generate a plan on every push to main.
+# A plan never auto-applies; production changes happen via the workflow_dispatch
+# entry below, which runs apply after a fresh plan.
+#
+# Required GitHub repo secrets (set via Settings -> Secrets and variables -> Actions):
+#   AWS_DEPLOY_ROLE_ARN          ARN of the deployer role created in iam/. Output by `terraform output github_deployer_role_arn`.
+#   AWS_REGION                   Region the stack lives in, e.g. us-east-1.
+#   TF_STATE_BUCKET              Name of the state bucket created by bootstrap.
+#   TF_STATE_LOCK_TABLE          Name of the lock table created by bootstrap. Defaults to corastate-tfstate-lock.
+#
+# Required repo variables (Settings -> Variables -> Actions):
+#   TF_VAR_domain                Public hostname, e.g. app.corastate.io.
+#   TF_VAR_route53_zone_id       Hosted zone ID.
+#   TF_VAR_github_oidc_provider_arn
+#   TF_VAR_terraform_state_bucket_arn
+#   TF_VAR_terraform_state_lock_table_arn
+#
+# Everything sensitive is fetched at job-launch time via OIDC; no long-lived
+# AWS keys are ever stored in the repo.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'Dockerfile'
+      - 'terraform/**'
+      - '.github/workflows/aws-deploy.yml'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/aws-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Run `terraform apply` after the plan. Leave unchecked to plan only.'
+        type: boolean
+        default: false
+
+concurrency:
+  group: aws-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  TF_VERSION: '1.9.8'
+  TF_WORKING_DIR: terraform/environments/production
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and push the four images. Only runs on push to main; PRs and dispatch
+  # use the existing tag.
+  # ---------------------------------------------------------------------------
+  build-images:
+    name: Build and push images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: backend
+            repo: corastate-backend
+          - target: worker
+            repo: corastate-worker
+          - target: web
+            repo: corastate-web
+          - target: cli
+            repo: corastate-cli
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.target }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: ${{ matrix.target }}
+          push: true
+          platforms: linux/arm64
+          provenance: false
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.repo }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.repo }}:latest
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+
+  # ---------------------------------------------------------------------------
+  # Terraform fmt, validate, and plan against environments/production.
+  # Always runs. The plan output is posted as a commit comment (or PR comment).
+  # ---------------------------------------------------------------------------
+  terraform-plan:
+    name: Terraform plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform fmt (recursive, check)
+        run: terraform fmt -check -recursive
+        working-directory: terraform
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_domain: ${{ vars.TF_VAR_domain }}
+          TF_VAR_route53_zone_id: ${{ vars.TF_VAR_route53_zone_id }}
+          TF_VAR_github_oidc_provider_arn: ${{ vars.TF_VAR_github_oidc_provider_arn }}
+          TF_VAR_terraform_state_bucket_arn: ${{ vars.TF_VAR_terraform_state_bucket_arn }}
+          TF_VAR_terraform_state_lock_table_arn: ${{ vars.TF_VAR_terraform_state_lock_table_arn }}
+          TF_VAR_image_tag: ${{ github.event_name == 'push' && github.sha || 'latest' }}
+        run: |
+          set -o pipefail
+          terraform plan -no-color -out=tfplan -input=false | tee plan.txt
+          {
+            echo 'plan<<TFPLAN_EOF'
+            cat plan.txt
+            echo 'TFPLAN_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.run_id }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 7
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.plan }}`;
+            const truncated = plan.length > 60000
+              ? plan.slice(0, 60000) + '\n\n... (truncated, see artifact tfplan-${{ github.run_id }})'
+              : plan;
+            const body = [
+              '### Terraform plan (`environments/production`)',
+              '',
+              '```hcl',
+              truncated,
+              '```',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Comment plan on commit
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.plan }}`;
+            const truncated = plan.length > 60000
+              ? plan.slice(0, 60000) + '\n\n... (truncated, see artifact tfplan-${{ github.run_id }})'
+              : plan;
+            const body = [
+              '### Terraform plan (`environments/production`)',
+              '',
+              '```hcl',
+              truncated,
+              '```',
+            ].join('\n');
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body,
+            });
+
+  # ---------------------------------------------------------------------------
+  # Apply. Runs only on workflow_dispatch with apply=true. Re-plans inside the
+  # same job to keep the plan and apply atomic.
+  # ---------------------------------------------------------------------------
+  terraform-apply:
+    name: Terraform apply
+    if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+    runs-on: ubuntu-latest
+    needs: [terraform-plan]
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_domain: ${{ vars.TF_VAR_domain }}
+          TF_VAR_route53_zone_id: ${{ vars.TF_VAR_route53_zone_id }}
+          TF_VAR_github_oidc_provider_arn: ${{ vars.TF_VAR_github_oidc_provider_arn }}
+          TF_VAR_terraform_state_bucket_arn: ${{ vars.TF_VAR_terraform_state_bucket_arn }}
+          TF_VAR_terraform_state_lock_table_arn: ${{ vars.TF_VAR_terraform_state_lock_table_arn }}
+          TF_VAR_image_tag: ${{ github.sha }}
+        run: terraform plan -no-color -out=tfplan -input=false
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -no-color -input=false -auto-approve tfplan
+
+  # ---------------------------------------------------------------------------
+  # After image push on main, force a new deployment on each ECS service so
+  # the latest tagged image rolls out without waiting for the next Terraform
+  # apply. Skipped if image build was skipped.
+  # ---------------------------------------------------------------------------
+  ecs-deploy:
+    name: Roll ECS services
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [build-images]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, worker, web]
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new deployment for ${{ matrix.service }}
+        run: |
+          aws ecs update-service \
+            --cluster corastate-prod-cluster \
+            --service corastate-prod-${{ matrix.service }} \
+            --force-new-deployment \
+            --no-cli-pager

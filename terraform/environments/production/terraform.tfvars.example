@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars and fill in the values. terraform.tfvars is
+# git-ignored; the .example file is checked in as documentation.
+
+aws_region  = "us-east-1"
+name_prefix = "corastate-prod"
+
+# Public domain and the Route53 hosted zone that owns it. The zone must
+# already exist; Terraform manages records inside it but does not create
+# the zone itself.
+domain          = "app.corastate.example"
+route53_zone_id = "Z000000000000000000000"
+
+# Outputs from the bootstrap workspace. Run bootstrap first, then paste in.
+github_oidc_provider_arn       = "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+terraform_state_bucket_arn     = "arn:aws:s3:::corastate-tfstate-CHANGE-ME"
+terraform_state_lock_table_arn = "arn:aws:dynamodb:us-east-1:000000000000:table/corastate-tfstate-lock"
+
+# Sizing knobs. Defaults match the README cost estimate.
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage_gb = 20
+db_multi_az             = false
+
+backend_desired_count = 2
+worker_desired_count  = 1
+web_desired_count     = 2
+
+# CI overrides this with the commit SHA on every push.
+image_tag = "latest"
+
+github_repository  = "corastate/corastate"
+log_retention_days = 30

@@ -150,3 +150,21 @@ vite.config.ts.timestamp-*
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/blob-report/
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+# Real tfvars never get committed; the *.example files do.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

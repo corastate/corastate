@@ -1,0 +1,4 @@
+aws_region            = "us-east-1"
+state_bucket_name     = "corastate-tfstate-CHANGE-ME"
+state_lock_table_name = "corastate-tfstate-lock"
+github_repository     = "corastate/corastate"
